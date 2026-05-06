@@ -1,2 +1,29 @@
 <!DOCTYPE html>
 <html>
+<head><title>Register - GovKonek</title></head>
+<body>
+    <h2>Register an Account</h2>
+    
+    <!-- Flash messages for errors -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}<ul>{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>{% endif %}
+    {% endwith %}
+
+    <form method="POST">
+        <label>Username:</label><br>
+        <input type="text" name="username" required><br><br>
+        
+        <label>Password:</label><br>
+        <input type="password" name="password" required><br><br>
+        
+        <label>Role:</label><br>
+        <select name="role">
+            <option value="citizen">Citizen</option>
+            <option value="publisher">Barangay Official (Publisher)</option>
+        </select><br><br>
+        
+        <button type="submit">Register</button>
+    </form>
+    <a href="{{ url_for('login') }}">Already have an account? Login</a>
+</body>
+</html>

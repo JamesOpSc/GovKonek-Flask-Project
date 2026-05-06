@@ -1,2 +1,23 @@
 <!DOCTYPE html>
 <html>
+<head><title>Dashboard - GovKonek</title></head>
+<body>
+    <h2>Welcome, {{ name }}!</h2>
+    <p>Your current role is: <strong>{{ role }}</strong></p>
+    
+    {% if role == 'publisher' %}
+        <div style="background-color: #ffcccc; padding: 10px;">
+            <h3>Barangay Official Panel</h3>
+            <p>You have access to post announcements and manage projects.</p>
+        </div>
+    {% else %}
+        <div style="background-color: #ccffcc; padding: 10px;">
+            <h3>Citizen Panel</h3>
+            <p>You can submit service requests and view updates.</p>
+        </div>
+    {% endif %}
+
+    <br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>
