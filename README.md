@@ -1,6 +1,6 @@
 # GovKonek Backend - Local Setup & Testing Guide 🚀
 
-Welcome to the GovKonek Backend repository! We are building the Phase 1 foundation using **Python, Flask, and SQLite**. 
+Welcome to the GovKonek Backend repository! We are building the foundation using **Python, Flask, and SQLite**. 
 
 To avoid database conflicts and broken dependencies, **do not share virtual environments or database files**. Everyone must set up their own local environment by following this guide.
 
