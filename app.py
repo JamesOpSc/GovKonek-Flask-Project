@@ -8,6 +8,25 @@ app = Flask(__name__)
 # For a real production app, this should be a random string hidden in a .env file.
 app.secret_key = 'govkonek_super_secret_key' 
 
+# ==========================================
+# 🎨 UI PROTOTYPING ROUTES (For Frontend Testing)
+# ==========================================
+
+@app.route('/ui/login')
+def ui_login():
+    return render_template('login.html')
+
+@app.route('/ui/dashboard')
+def ui_dashboard():
+    # Passing dummy data just to see how the HTML looks
+    return render_template('dashboard.html', name="Juan", role="citizen")
+
+@app.route('/ui/feed')
+def ui_feed():
+    return render_template('components/feed.html')
+
+# ==========================================
+
 # Set up the Login Manager
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -36,6 +55,10 @@ def load_user(user_id):
     if user_data:
         return User(id=user_data['id'], username=user_data['username'], role=user_data['role'])
     return None
+
+@app.route('/')
+def home():
+    return redirect(url_for('login'))
 
 # 3. Registration Route
 @app.route('/register', methods=['GET', 'POST'])

@@ -1,23 +1,112 @@
 <!DOCTYPE html>
-<html>
-<head><title>Dashboard - GovKonek</title></head>
-<body>
-    <h2>Welcome, {{ name }}!</h2>
-    <p>Your current role is: <strong>{{ role }}</strong></p>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GovKonek | Dashboard</title>
     
-    {% if role == 'publisher' %}
-        <div style="background-color: #ffcccc; padding: 10px;">
-            <h3>Barangay Official Panel</h3>
-            <p>You have access to post announcements and manage projects.</p>
-        </div>
-    {% else %}
-        <div style="background-color: #ccffcc; padding: 10px;">
-            <h3>Citizen Panel</h3>
-            <p>You can submit service requests and view updates.</p>
-        </div>
-    {% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <br>
-    <a href="{{ url_for('logout') }}">Logout</a>
+    <style>
+        /* Modern CSS Variables */
+        :root {
+            --primary: #0ea5e9;
+            --primary-hover: #0284c7;
+            --background: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--background); color: var(--text-main); display: flex; height: 100vh; }
+
+        /* Sidebar Layout */
+        .sidebar {
+            width: 260px;
+            background: white;
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+        .brand { font-size: 22px; font-weight: 700; color: var(--primary); margin-bottom: 30px; }
+        
+        /* Main Workspace */
+        .workspace { flex: 1; padding: 40px; overflow-y: auto; }
+        .header { margin-bottom: 30px; }
+        .header h2 { font-size: 28px; font-weight: 700; }
+        .header p { color: var(--text-muted); margin-top: 5px; }
+
+        /* Modern Cards */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            border-left: 5px solid var(--primary);
+        }
+        .card.admin { border-left-color: #ef4444; } /* Red for admin */
+        .card.citizen { border-left-color: #10b981; } /* Green for citizen */
+        
+        .card h3 { margin-bottom: 10px; font-size: 20px; }
+        .card p { color: var(--text-muted); line-height: 1.6; }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 20px;
+            transition: 0.2s;
+        }
+        .btn:hover { background-color: var(--primary-hover); }
+        .btn-logout { background-color: white; color: #ef4444; border: 1px solid #ef4444; margin-top: auto; text-align: center; }
+        .btn-logout:hover { background-color: #fef2f2; }
+    </style>
+</head>
+<body>
+
+    <nav class="sidebar">
+        <div class="brand">🏛️ GovKonek</div>
+        <p style="color: var(--text-muted); font-weight: 500; margin-bottom: 10px;">Menu</p>
+        <p style="padding: 10px 0; font-weight: 600; color: var(--primary);">🏠 Home Dashboard</p>
+        
+        <a href="{{ url_for('logout') }}" class="btn btn-logout">Logout</a>
+    </nav>
+
+    <main class="workspace">
+        <div class="header">
+            <h2>Welcome back, {{ name }}!</h2>
+            <p>Your current role access is: <strong>{{ role }}</strong></p>
+        </div>
+
+        {% if role == 'publisher' %}
+            <div class="card admin">
+                <h3>🛡️ Barangay Official Panel</h3>
+                <p>You have administrative access. From here you can post official announcements, update community projects, and manage incoming citizen requests.</p>
+                <a href="#" class="btn" style="background-color: #ef4444;">+ Create Announcement</a>
+            </div>
+        {% else %}
+            <div class="card citizen">
+                <h3>👤 Citizen Panel</h3>
+                <p>Welcome to your local portal. You can submit service requests, track your documents, and view real-time updates from your barangay officials.</p>
+                <a href="#" class="btn" style="background-color: #10b981;">📄 Request Document</a>
+            </div>
+        {% endif %}
+
+    </main>
+
 </body>
 </html>

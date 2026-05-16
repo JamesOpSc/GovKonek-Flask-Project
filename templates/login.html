@@ -1,22 +1,179 @@
 <!DOCTYPE html>
-<html>
-<head><title>Login - GovKonek</title></head>
-<body>
-    <h2>Login</h2>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GovKonek | Sign In</title>
     
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}<ul>{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>{% endif %}
-    {% endwith %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <form method="POST">
-        <label>Username:</label><br>
-        <input type="text" name="username" required><br><br>
+    <style>
+        :root {
+            --primary: #0056b3; /* Deep, authoritative government blue */
+            --primary-hover: #004085;
+            --background: #f1f5f9; /* Soft light gray to reduce eye strain */
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #cbd5e1;
+            --radius: 12px;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
         
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br><br>
+        body {
+            background-color: var(--background);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Centered Login Container */
+        .login-card {
+            background: var(--surface);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px 30px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        /* Prominent Brand Recognition */
+        .brand-header {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
         
-        <button type="submit">Login</button>
-    </form>
-    <a href="{{ url_for('register') }}">Need an account? Register</a>
+        .brand-text {
+            color: #1a2a3a; /* The dark navy blue from your logo */
+            font-size: 42px; /* Made it slightly larger to stand out */
+            font-weight: 800; /* Extra bold */
+            text-decoration: underline;
+            text-decoration-color: #1a2a3a; /* The blue underline */
+            text-underline-offset: 8px; 
+            text-decoration-thickness: 2px;
+        }
+
+        .sub-tagline {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 35px;
+            font-weight: 500;
+        }
+
+        /* Form Controls */
+        .form-group {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.2s ease;
+            background-color: #f8fafc;
+        }
+
+        /* Accessible Focus States */
+        .form-input:focus {
+            border-color: var(--primary);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.15);
+        }
+
+        /* Big, Bold Action Button */
+        .btn-submit {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 10px;
+            margin-bottom: 25px;
+        }
+
+        .btn-submit:hover {
+            background-color: var(--primary-hover);
+        }
+
+        /* Simple Navigation Links */
+        .form-footer {
+            font-size: 14px;
+            color: var(--text-muted);
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+
+        .form-footer a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+      <div class="brand-header">
+            <span class="brand-text">GovKonek</span>
+        </div>
+        <div class="sub-tagline">Bringing Local Government and Citizens Closer</div>
+        <div class="sub-tagline">Barangay Digital Portal Login</div>
+
+        <form method="POST" action="#">
+            
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="Enter your password" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn-submit">Sign In</button>
+        </form>
+
+        <div class="form-footer">
+            Don't have an account yet? <a href="{{ url_for('register') }}">Register Here</a>
+        </div>
+    </div>
+
 </body>
 </html>
