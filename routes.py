@@ -101,6 +101,17 @@ def create_routes(app):
         """
         return render_template('dashboard.html', name=current_user.username, role=current_user.role)
 
+    @app.route('/profile')
+    @login_required
+    def profile():
+        """
+        User profile page - displays user information.
+        
+        Shows the authenticated user's profile including their username and role.
+        Protected by @login_required - unauthenticated users are redirected to login.
+        """
+        return render_template('profile.html', name=current_user.username, role=current_user.role)
+
     @app.route('/logout')
     @login_required
     def logout():
