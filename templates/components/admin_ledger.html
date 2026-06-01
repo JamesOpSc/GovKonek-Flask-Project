@@ -1,0 +1,98 @@
+<style>
+    /* Admin workspace visualizer per request */
+    .ledger-header {
+        background: #1f2937; /* Dark header per Figma image */
+        color: white;
+        padding: 12px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+    .pub-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .pub-table th {
+        text-align: left;
+        color: #64748b;
+        font-weight: 600;
+        padding: 12px 15px;
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .pub-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 14px;
+    }
+    .btn-action {
+        background: white;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+</style>
+
+<div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
+    <div class="ledger-header">
+        <span style="font-weight: 600;">GovKonek | Admin Workspace</span>
+        <span style="font-size: 13px; color: #94a3b8;">Logged in as: BrgyCapt_01</span>
+    </div>
+    
+    <div style="padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0;">
+        <h3 style="font-size: 20px; font-weight: 700;">Information Ledger</h3>
+        <button class="btn" style="background: var(--primary); color: white;">+ Publish New Update</button>
+    </div>
+
+    <div style="padding: 20px;">
+        <table class="pub-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Date Posted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="status-badge status-published">Published</span></td>
+                    <td>Free Dental Mission Weekend</td>
+                    <td>Health</td>
+                    <td>Today, 09:15 AM</td>
+                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
+                </tr>
+                 <tr>
+                    <td><span class="status-badge status-published">Published</span></td>
+                    <td>Voter's Registration Reminder</td>
+                    <td>Announcement</td>
+                    <td>Today, 08:00 AM</td>
+                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
+                </tr>
+                 <tr>
+                    <td><span class="status-badge status-published">Published</span></td>
+                    <td>Water Interruption - Zone 3</td>
+                    <td>Emergency</td>
+                    <td>Yesterday, 14:30 PM</td>
+                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
+                </tr>
+                 <tr>
+                    <td><span class="status-badge status-published">Published</span></td>
+                    <td>Barangay Hall Renovation</td>
+                    <td>Project</td>
+                    <td>May 14, 2026</td>
+                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>

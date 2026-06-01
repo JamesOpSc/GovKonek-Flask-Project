@@ -113,7 +113,14 @@ def login():
 def dashboard():
     return render_template('dashboard.html', name=current_user.username, role=current_user.role)
 
-# 6. Logout Route
+# 6. User Profile Route
+@app.route('/profile')
+@login_required
+def profile():
+    # In the future, you will query the DB here for their full address, ID numbers, etc.
+    return render_template('profile.html', name=current_user.username, role=current_user.role)
+
+# 7. Logout Route
 @app.route('/logout')
 @login_required
 def logout():

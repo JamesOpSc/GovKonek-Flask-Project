@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GovKonek</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* GLOBAL VARIABLES */
+        :root {
+            --primary: #0056b3; 
+            --background: #f1f5f9; /* 🔥 This is the magic color that makes the white cards float! */
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        
+        /* The body applies the dark-ish background globally */
+        body { 
+            background-color: var(--background); 
+            color: var(--text-main); 
+            display: flex; 
+            min-height: 100vh; 
+        }
+
+        /* Shared Global Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn:hover { background-color: #004085; }
+    </style>
+</head>
+<body>
+    
+    {% include 'components/sidebar.html' %}
+
+    <main class="workspace" style="margin-left: 220px; padding: 40px; width: 100%;">
+        
+        {% block content %}
+        {% endblock %}
+        
+    </main>
+
+</body>
+</html>

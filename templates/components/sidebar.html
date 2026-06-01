@@ -1,0 +1,74 @@
+<style>
+    /* Thinner sidebar (Advise editing base.html margin-left) */
+    .sidebar {
+        width: 220px; /* Reduced width per request */
+        background: #ffffff;
+        border-right: 1px solid #e2e8f0;
+        padding: 30px 20px;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+        z-index: 50;
+    }
+    .brand {
+        color: #1a2a3a;
+        font-size: 24px;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 50px;
+        text-decoration: underline;
+        text-decoration-color: #0ea5e9; /* Light blue underline */
+        text-underline-offset: 6px;
+        text-decoration-thickness: 2px;
+    }
+    .sidebar-link {
+        color: #1f2937;
+        padding: 12px 15px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+    .sidebar-link:hover {
+        background: #f1f5f9;
+        color: #0ea5e9;
+    }
+    .sidebar-link.active {
+        background: #f0f9ff;
+        color: #0ea5e9;
+        font-weight: 700;
+    }
+    .btn-logout {
+        margin-top: auto;
+        background: white;
+        color: #ef4444;
+        border: 1px solid #ef4444;
+        border-radius: 8px;
+        padding: 12px;
+        width: 100%;
+        text-align: center;
+        font-weight: 600;
+        transition: 0.2s;
+    }
+    .btn-logout:hover {
+        background: #fef2f2;
+    }
+</style>
+
+<nav class="sidebar">
+    <div class="brand">GovKonek</div>
+    
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        <a href="#" class="sidebar-link active">🏠 Home Dashboard</a>
+        <a href="#" class="sidebar-link">📄 E-Services</a>
+        <a href="#" class="sidebar-link">🗣️ Citizens' Voice</a>
+    </div>
+
+    <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
+</nav>

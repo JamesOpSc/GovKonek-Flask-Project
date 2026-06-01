@@ -11,9 +11,8 @@
 
     <style>
         :root {
-            --primary: #0056b3; /* Deep, authoritative government blue */
-            --primary-hover: #004085;
-            --background: #f1f5f9; /* Soft light gray to reduce eye strain */
+            --primary: #0056b3; 
+            --background: #f1f5f9; 
             --surface: #ffffff;
             --text-main: #0f172a;
             --text-muted: #64748b;
@@ -34,7 +33,7 @@
             padding: 20px;
         }
 
-        /* Centered Login Container */
+        /* The Friendly First Impression */
         .login-card {
             background: var(--surface);
             width: 100%;
@@ -46,28 +45,19 @@
             text-align: center;
         }
 
-        /* Prominent Brand Recognition */
+        /* Branding: As defined in previous instructions with Blue Underline */
         .brand-header {
             font-size: 32px;
             font-weight: 700;
-            color: var(--primary);
+            color: #1a2a3a; /* Dark-ish blue-black text */
             margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
-        .brand-text {
-            color: #1a2a3a; /* The dark navy blue from your logo */
-            font-size: 42px; /* Made it slightly larger to stand out */
-            font-weight: 800; /* Extra bold */
             text-decoration: underline;
-            text-decoration-color: #1a2a3a; /* The blue underline */
+            text-decoration-color: #0ea5e9; /* Blue wavy-style underline */
             text-underline-offset: 8px; 
             text-decoration-thickness: 2px;
         }
-
+        
+        /* The Slogan below branding per request */
         .sub-tagline {
             font-size: 14px;
             color: var(--text-muted);
@@ -75,7 +65,7 @@
             font-weight: 500;
         }
 
-        /* Form Controls */
+        /* Modernized Form Controls */
         .form-group {
             text-align: left;
             margin-bottom: 20px;
@@ -100,14 +90,25 @@
             background-color: #f8fafc;
         }
 
-        /* Accessible Focus States */
         .form-input:focus {
             border-color: var(--primary);
             background-color: #fff;
             box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.15);
         }
 
-        /* Big, Bold Action Button */
+/* Flash Message Alerts */
+        .alert {
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            border-left: 4px solid #ef4444;
+            text-align: left;
+        }
+        
+        /* Prominent submit button */
         .btn-submit {
             width: 100%;
             background-color: var(--primary);
@@ -124,10 +125,9 @@
         }
 
         .btn-submit:hover {
-            background-color: var(--primary-hover);
+            background-color: #004085;
         }
 
-        /* Simple Navigation Links */
         .form-footer {
             font-size: 14px;
             color: var(--text-muted);
@@ -149,14 +149,20 @@
 <body>
 
     <div class="login-card">
-      <div class="brand-header">
-            <span class="brand-text">GovKonek</span>
-        </div>
+        
+        <div class="brand-header">GovKonek</div>
         <div class="sub-tagline">Bringing Local Government and Citizens Closer</div>
-        <div class="sub-tagline">Barangay Digital Portal Login</div>
 
         <form method="POST" action="#">
-            
+            {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="alert">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" class="form-input" placeholder="Enter your username" required autocomplete="username">
@@ -171,9 +177,9 @@
         </form>
 
         <div class="form-footer">
-            Don't have an account yet? <a href="{{ url_for('register') }}">Register Here</a>
-        </div>
+        Don't have an account yet? <a href="{{ url_for('register') }}">Register Here</a>
     </div>
+    
 
 </body>
 </html>
