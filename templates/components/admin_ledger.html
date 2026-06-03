@@ -1,9 +1,8 @@
 <style>
-    /* Admin workspace visualizer per request */
     .ledger-header {
-        background: #1f2937; /* Dark header per Figma image */
+        background: #1f2937;
         color: white;
-        padding: 12px 20px;
+        padding: 14px 24px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -14,85 +13,323 @@
     .pub-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 15px;
+        margin-top: 8px;
     }
     .pub-table th {
         text-align: left;
         color: #64748b;
         font-weight: 600;
-        padding: 12px 15px;
+        padding: 12px 16px;
         background: #f8fafc;
         border-bottom: 2px solid #e2e8f0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .pub-table td {
-        padding: 12px 15px;
-        border-bottom: 1px solid #e2e8f0;
+        padding: 14px 16px;
+        border-bottom: 1px solid #f1f5f9;
         font-size: 14px;
     }
+    .pub-table tbody tr:hover { background: #f8fafc; }
     .btn-action {
         background: white;
-        color: #64748b;
+        color: #334155;
         border: 1px solid #e2e8f0;
-        padding: 6px 12px;
+        padding: 7px 14px;
         border-radius: 6px;
         font-size: 12px;
         font-weight: 600;
         cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-action:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .btn-action.delete:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+
+    /* Modal overlay */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+        background: #fff;
+        border-radius: 16px;
+        width: 90%;
+        max-width: 560px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        overflow: hidden;
+        animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn { from { opacity:0; transform:scale(0.95) translateY(-10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    .modal-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h3 { font-size: 18px; font-weight: 700; color: #0f172a; }
+    .modal-close {
+        background: none; border: none; font-size: 24px; cursor: pointer;
+        color: #94a3b8; padding: 4px 8px; border-radius: 6px;
+    }
+    .modal-close:hover { background: #f1f5f9; color: #0f172a; }
+    .modal-body { padding: 24px; }
+    .modal-body label {
+        display: block; font-size: 13px; font-weight: 600;
+        color: #334155; margin-bottom: 6px; margin-top: 16px;
+    }
+    .modal-body label:first-child { margin-top: 0; }
+    .modal-body input, .modal-body textarea {
+        width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0;
+        border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif;
+        outline: none; transition: border-color 0.2s;
+    }
+    .modal-body input:focus, .modal-body textarea:focus { border-color: #0056b3; }
+    .modal-body textarea { resize: vertical; min-height: 120px; }
+    .modal-footer {
+        padding: 16px 24px; border-top: 1px solid #e2e8f0;
+        display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .btn-cancel {
+        background: #fff; color: #334155; border: 1px solid #e2e8f0;
+        padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;
+    }
+    .btn-cancel:hover { background: #f1f5f9; }
+    .btn-save {
+        background: #0056b3; color: #fff; border: none;
+        padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer;
+    }
+    .btn-save:hover { background: #004085; }
+    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Toast notification */
+    .toast {
+        position: fixed; bottom: 30px; right: 30px; z-index: 2000;
+        padding: 14px 24px; border-radius: 10px; color: #fff; font-weight: 600;
+        font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        animation: slideUp 0.3s ease;
+        display: none;
+    }
+    .toast.success { background: #10b981; }
+    .toast.error { background: #ef4444; }
+    @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+    .empty-state {
+        text-align: center; padding: 40px; color: #94a3b8;
     }
 </style>
 
-<div class="card" style="padding: 0; overflow: hidden; margin-top: 30px;">
-    <div class="ledger-header">
-        <span style="font-weight: 600;">GovKonek | Admin Workspace</span>
-        <span style="font-size: 13px; color: #94a3b8;">Logged in as: BrgyCapt_01</span>
-    </div>
-    
-    <div style="padding: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0;">
-        <h3 style="font-size: 20px; font-weight: 700;">Information Ledger</h3>
-        <button class="btn" style="background: var(--primary); color: white;">+ Publish New Update</button>
-    </div>
+<!-- Toast -->
+<div class="toast" id="adminToast"></div>
 
-    <div style="padding: 20px;">
-        <table class="pub-table">
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Title</th>
-                    <th>Category</th>
-                    <th>Date Posted</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><span class="status-badge status-published">Published</span></td>
-                    <td>Free Dental Mission Weekend</td>
-                    <td>Health</td>
-                    <td>Today, 09:15 AM</td>
-                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
-                </tr>
-                 <tr>
-                    <td><span class="status-badge status-published">Published</span></td>
-                    <td>Voter's Registration Reminder</td>
-                    <td>Announcement</td>
-                    <td>Today, 08:00 AM</td>
-                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
-                </tr>
-                 <tr>
-                    <td><span class="status-badge status-published">Published</span></td>
-                    <td>Water Interruption - Zone 3</td>
-                    <td>Emergency</td>
-                    <td>Yesterday, 14:30 PM</td>
-                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
-                </tr>
-                 <tr>
-                    <td><span class="status-badge status-published">Published</span></td>
-                    <td>Barangay Hall Renovation</td>
-                    <td>Project</td>
-                    <td>May 14, 2026</td>
-                    <td><button class="btn-action">Edit</button> <button class="btn-action" style="color: #ef4444;">Delete</button></td>
-                </tr>
-            </tbody>
-        </table>
+<!-- Modal -->
+<div class="modal-overlay" id="postModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Publish New Announcement</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <label for="postTitle">Title</label>
+            <input type="text" id="postTitle" placeholder="Enter announcement title..." maxlength="200">
+            <label for="postContent">Content</label>
+            <textarea id="postContent" placeholder="Write your announcement here..."></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-save" id="btnSave" onclick="savePost()">Publish</button>
+        </div>
     </div>
 </div>
+
+<!-- Admin Workspace Card -->
+<div class="card" style="padding: 0; overflow: hidden; margin-top: 20px;">
+    <div class="ledger-header">
+        <span style="font-weight: 600;">🏛️ GovKonek | Admin Workspace</span>
+        <span style="font-size: 13px; color: #94a3b8;" id="adminUserLabel"></span>
+    </div>
+    
+    <div style="padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0;">
+        <h3 style="font-size: 20px; font-weight: 700;">📋 Information Ledger</h3>
+        <button class="btn" style="background: var(--primary); color: white;" onclick="openCreateModal()">
+            + Publish New Update
+        </button>
+    </div>
+
+    <div style="padding: 20px 24px;" id="ledgerContent">
+        <div class="loading-spinner"><div class="spinner"></div></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    let editingPostId = null;
+    const username = window.GOVKONEK_USERNAME || 'Admin';
+    document.getElementById('adminUserLabel').textContent = 'Logged in as: ' + username;
+
+    // Load posts into the ledger table
+    async function loadLedger() {
+        const container = document.getElementById('ledgerContent');
+        try {
+            const res = await fetch('/api/posts');
+            const data = await res.json();
+            if (!data.posts || data.posts.length === 0) {
+                container.innerHTML = '<div class="empty-state">No announcements yet. Click "+ Publish New Update" to create one.</div>';
+                return;
+            }
+            container.innerHTML = `
+            <table class="pub-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Title</th>
+                        <th>Date Posted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.posts.map(p => `
+                        <tr>
+                            <td><span class="status-badge status-published">${p.status || 'Published'}</span></td>
+                            <td style="font-weight:600;">${escapeHtml(p.title)}</td>
+                            <td style="color:#64748b;">${formatDateShort(p.created_at)}</td>
+                            <td>
+                                <button class="btn-action" onclick="openEditModal(${p.id}, '${escapeJs(p.title)}', '${escapeJs(p.content)}')">✏️ Edit</button>
+                                <button class="btn-action delete" onclick="confirmDelete(${p.id}, '${escapeJs(p.title)}')">🗑️ Delete</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+        } catch (e) {
+            container.innerHTML = '<div class="empty-state">Failed to load posts. Please refresh.</div>';
+        }
+    }
+
+    // Modal open for create
+    window.openCreateModal = function() {
+        editingPostId = null;
+        document.getElementById('modalTitle').textContent = 'Publish New Announcement';
+        document.getElementById('postTitle').value = '';
+        document.getElementById('postContent').value = '';
+        document.getElementById('btnSave').textContent = 'Publish';
+        document.getElementById('postModal').classList.add('active');
+    };
+
+    // Modal open for edit
+    window.openEditModal = function(postId, title, content) {
+        editingPostId = postId;
+        document.getElementById('modalTitle').textContent = 'Edit Announcement';
+        document.getElementById('postTitle').value = title;
+        document.getElementById('postContent').value = content;
+        document.getElementById('btnSave').textContent = 'Save Changes';
+        document.getElementById('postModal').classList.add('active');
+    };
+
+    // Close modal
+    window.closeModal = function() {
+        document.getElementById('postModal').classList.remove('active');
+        editingPostId = null;
+    };
+
+    // Save (create or update)
+    window.savePost = async function() {
+        const title = document.getElementById('postTitle').value.trim();
+        const content = document.getElementById('postContent').value.trim();
+        if (!title || !content) {
+            showToast('Please fill in both title and content.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('btnSave');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            let res;
+            if (editingPostId) {
+                res = await fetch(`/api/posts/${editingPostId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, content })
+                });
+            } else {
+                res = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, content })
+                });
+            }
+            const data = await res.json();
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                showToast(editingPostId ? 'Announcement updated!' : 'Announcement published!', 'success');
+                closeModal();
+                loadLedger();
+            }
+        } catch (e) {
+            showToast('Something went wrong. Please try again.', 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = editingPostId ? 'Save Changes' : 'Publish';
+    };
+
+    // Delete confirmation
+    window.confirmDelete = function(postId, title) {
+        if (confirm(`Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`)) {
+            deletePost(postId);
+        }
+    };
+
+    async function deletePost(postId) {
+        try {
+            const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.error) {
+                showToast(data.error, 'error');
+            } else {
+                showToast('Announcement deleted.', 'success');
+                loadLedger();
+            }
+        } catch (e) {
+            showToast('Failed to delete post.', 'error');
+        }
+    }
+
+    // Toast
+    function showToast(msg, type) {
+        const toast = document.getElementById('adminToast');
+        toast.textContent = msg;
+        toast.className = 'toast ' + type;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 3000);
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+    function escapeJs(str) {
+        return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    }
+    function formatDateShort(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr.replace(' ', 'T') + 'Z');
+        return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) +
+               ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Initial load
+    loadLedger();
+})();
+</script>

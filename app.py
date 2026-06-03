@@ -8,94 +8,134 @@ This application implements all 4 OOP pillars:
     4. POLYMORPHISM - User subclasses override methods for role-based behavior
 
 Architecture:
-    - config.py: Configuration settings
+    - config.py: Configuration settings (injectable Config class)
     - models.py: Domain models (User, CitizenUser, PublisherUser)
-    - repository.py: Database layer (UserRepository)
-    - service.py: Business logic (AuthService)
-    - routes.py: Flask routes
-    - app.py: Flask application setup (this file)
+    - repository.py: Database layer (injectable UserRepository, PostRepository)
+    - service.py: Business logic (injectable AuthService, PostService)
+    - routes.py: Flask routes (access services via current_app.extensions)
+    - app.py: Flask application setup with dependency injection container
 
-This modular structure makes the code more:
-    - Testable: Each layer can be tested independently
-    - Maintainable: Changes to one layer don't affect others
-    - Reusable: Services can be used in different contexts (CLI, API, etc.)
-    - Scalable: Easy to add new features without modifying existing code
+REFACTORED for testability:
+    - All dependencies are wired in create_app() and stored on app.extensions.
+    - In tests, pass mock repositories/services via create_app(test_config=...).
+    - Each layer can be tested in isolation with injected mocks.
 """
 
 from flask import Flask
 from flask_login import LoginManager
-from config import SECRET_KEY, LOGIN_VIEW, DATABASE_NAME
-from repository import UserRepository
+from config import Config, SECRET_KEY, LOGIN_VIEW
+from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository
+from service import AuthService, PostService
 from models import create_user_from_db
 from routes import create_routes
 
 
-# FLASK APPLICATION SETUP
-def create_app():
+# ===========================================================================
+# Dependency Injection Container
+# ===========================================================================
+
+def _build_services(app, config):
     """
-    Application factory function.
-    
-    Creating the app in a factory function provides several benefits:
-    1. Multiple app instances can be created (useful for testing)
-    2. Configuration can be passed as parameters
-    3. App setup is clean and organized
-    
+    Wire up all dependencies and attach them to app.extensions.
+
+    This is the central dependency injection container.  Every service and
+    repository is created here and stored on the app so routes can access
+    them via `current_app.extensions[...]`.
+
+    In tests, you can bypass this by passing pre-built mock instances
+    directly into app.extensions before calling create_routes().
+
+    @param app: Flask application instance
+    @param config: Config instance with db_name, secret_key, etc.
+    """
+    # -- repositories (injectable db_path) --------------------------------
+    user_repo = UserRepository(db_path=config.db_name)
+    post_repo = PostRepository(db_path=config.db_name)
+    project_repo = ProjectRepository(db_path=config.db_name)
+    service_repo = ServiceRepository(db_path=config.db_name)
+    document_repo = DocumentRepository(db_path=config.db_name)
+
+    # -- services (injectable repositories) -------------------------------
+    auth_service = AuthService(user_repo=user_repo)
+    post_service = PostService(post_repo=post_repo)
+
+    # -- attach to app ----------------------------------------------------
+    app.extensions['config'] = config
+    app.extensions['user_repo'] = user_repo
+    app.extensions['post_repo'] = post_repo
+    app.extensions['project_repo'] = project_repo
+    app.extensions['service_repo'] = service_repo
+    app.extensions['document_repo'] = document_repo
+    app.extensions['auth_service'] = auth_service
+    app.extensions['post_service'] = post_service
+
+
+# ===========================================================================
+# Application Factory
+# ===========================================================================
+
+def create_app(config=None):
+    """
+    Application factory with optional config injection for testing.
+
+    Usage:
+        # Production
+        app = create_app()
+
+        # Testing with in-memory DB
+        app = create_app(Config(db_name=':memory:', secret_key='test'))
+
+    @param config: Config instance (defaults to Config() with production values)
     @return: Configured Flask application instance
     """
     app = Flask(__name__)
-    
-    # Configure the Flask application
-    app.secret_key = SECRET_KEY
-    
-    # Set up Flask-Login for session management
+    cfg = config or Config()
+
+    # Flask configuration
+    app.secret_key = cfg.secret_key
+
+    # Wire dependencies
+    _build_services(app, cfg)
+
+    # Flask-Login
     setup_login_manager(app)
-    
-    # Register all routes
+
+    # Register routes
     create_routes(app)
-    
+
     return app
 
 
+# ===========================================================================
+# Flask-Login Setup
+# ===========================================================================
+
 def setup_login_manager(app):
     """
-    Configure Flask-Login for the application.
-    
-    Flask-Login requires a user_loader callback to reconstruct User objects from session.
-    This function centralizes all login configuration.
-    
-    @param app: Flask application instance
+    Configure Flask-Login with a user_loader that uses the injected UserRepository.
+
+    The user_loader accesses the repository via app.extensions so it works
+    with whatever repository was wired in (real or mock).
     """
     login_manager = LoginManager()
     login_manager.init_app(app)
     login_manager.login_view = LOGIN_VIEW
-    
+
     @login_manager.user_loader
     def load_user(user_id):
-        """
-        Flask-Login callback: Loads a user from the database when restoring a session.
-        
-        How it works:
-        1. When a user logs in, Flask-Login stores their user ID in the session
-        2. On subsequent requests, Flask-Login needs to rebuild the User object
-        3. Flask-Login calls this function with the stored user ID
-        4. We return the User object so Flask-Login can set current_user
-        
-        @param user_id: The user ID stored in the session
-        @return: User object if found, None if user was deleted from database
-        """
-        # Get raw user data from database
-        user_data = UserRepository.find_by_id(user_id)
+        """Rebuild User object from session using the injected UserRepository."""
+        user_repo = app.extensions.get('user_repo', UserRepository())
+        user_data = user_repo.find_by_id(user_id)
         if user_data:
-            # Create the correct User subclass based on role
             return create_user_from_db(user_data)
         return None
 
 
-# APPLICATION ENTRY POINT
+# ===========================================================================
+# Entry Point
+# ===========================================================================
+
 if __name__ == '__main__':
-    # Create the Flask application
     app = create_app()
-    
-    # Start the Flask development server
-    # debug=True enables auto-reload on code changes and better error pages
+    app.run(debug=True)
     app.run(debug=True)

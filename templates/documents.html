@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+        color: white;
+        padding: 28px 36px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+    .stat-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 18px;
+        text-align: center;
+    }
+    .stat-card .stat-icon { font-size: 30px; margin-bottom: 6px; }
+    .stat-card .stat-num { font-size: 24px; font-weight: 800; color: #0ea5e9; }
+    .stat-card .stat-label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 8px 20px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #475569;
+    }
+    .filter-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .filter-btn.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .doc-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .doc-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    .doc-card:hover {
+        border-color: #bae6fd;
+        box-shadow: 0 4px 16px rgba(14,165,233,0.08);
+    }
+    .doc-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: #f0f9ff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-title { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 3px; }
+    .doc-desc { font-size: 13px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .doc-meta {
+        display: flex;
+        gap: 14px;
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 6px;
+        flex-wrap: wrap;
+    }
+    .doc-category {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        background: #f0f9ff;
+        color: #0ea5e9;
+    }
+    .doc-download {
+        background: #0056b3;
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+    .doc-download:hover { background: #004085; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+    @media (max-width: 600px) {
+        .doc-card { flex-direction: column; align-items: flex-start; }
+        .doc-download { width: 100%; text-align: center; }
+    }
+</style>
+
+<div class="page-header">
+    <div>
+        <h2 style="font-size: 26px; font-weight: 700; margin-bottom: 4px;">🔍 Transparency Documents</h2>
+        <p style="opacity: 0.85;">Public records, reports, and ordinances — because accountability matters</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+</div>
+
+<div class="stats-row" id="statsRow">
+    <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-num" id="countTotal">-</div><div class="stat-label">Total Documents</div></div>
+    <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-num" id="countBudget">-</div><div class="stat-label">Budget Reports</div></div>
+    <div class="stat-card"><div class="stat-icon">📜</div><div class="stat-num" id="countOrdinance">-</div><div class="stat-label">Ordinances</div></div>
+    <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="countAudit">-</div><div class="stat-label">Audit Reports</div></div>
+</div>
+
+<div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-filter="all">📁 All Documents</button>
+</div>
+
+<div class="doc-list" id="docList">
+    <div class="loading-spinner"><div class="spinner"></div></div>
+</div>
+
+<script>
+(function() {
+    const docList = document.getElementById('docList');
+    const filterBar = document.getElementById('filterBar');
+    let allDocs = [];
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    function getDocIcon(cat) {
+        const icons = {
+            'Budget Report': '💰', 'Audit Report': '🔍', 'Ordinance': '📜',
+            'Resolution': '📝', 'Procurement': '📦', 'Disaster Preparedness': '⚠️'
+        };
+        return icons[cat] || '📄';
+    }
+
+    function renderDoc(d) {
+        return `
+        <div class="doc-card" data-category="${escapeHtml(d.category)}">
+            <div class="doc-icon">${getDocIcon(d.category)}</div>
+            <div class="doc-info">
+                <div class="doc-title">${escapeHtml(d.title)}</div>
+                <div class="doc-desc">${escapeHtml(d.description)}</div>
+                <div class="doc-meta">
+                    <span class="doc-category">${escapeHtml(d.category)}</span>
+                    <span>📅 ${d.published_date || 'N/A'}</span>
+                    ${d.file_size ? `<span>📎 ${escapeHtml(d.file_size)}</span>` : ''}
+                </div>
+            </div>
+            <button class="doc-download" onclick="alert('📥 Download feature coming soon! Document: ${escapeHtml(d.title).replace(/'/g, "\\'")}')">⬇ Download</button>
+        </div>`;
+    }
+
+    fetch('/api/documents')
+        .then(r => r.json())
+        .then(data => {
+            allDocs = data.documents || [];
+            if (allDocs.length === 0) {
+                docList.innerHTML = '<div class="empty-state">No documents available.</div>';
+                return;
+            }
+
+            // Build filter buttons
+            const cats = [...new Set(allDocs.map(d => d.category))];
+            let filterHtml = '<button class="filter-btn active" data-filter="all">📁 All Documents</button>';
+            cats.forEach(c => { filterHtml += `<button class="filter-btn" data-filter="${escapeHtml(c)}">${getDocIcon(c)} ${escapeHtml(c)}</button>`; });
+            filterBar.innerHTML = filterHtml;
+
+            // Render all
+            docList.innerHTML = allDocs.map(renderDoc).join('');
+
+            // Stats
+            document.getElementById('countTotal').textContent = allDocs.length;
+            document.getElementById('countBudget').textContent = allDocs.filter(d => d.category === 'Budget Report').length;
+            document.getElementById('countOrdinance').textContent = allDocs.filter(d => d.category === 'Ordinance').length;
+            document.getElementById('countAudit').textContent = allDocs.filter(d => d.category === 'Audit Report').length;
+        })
+        .catch(() => {
+            docList.innerHTML = '<div class="empty-state">Failed to load documents.</div>';
+        });
+
+    filterBar.addEventListener('click', e => {
+        if (e.target.classList.contains('filter-btn')) {
+            document.querySelectorAll('#filterBar .filter-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            const filter = e.target.dataset.filter;
+            document.querySelectorAll('.doc-card').forEach(card => {
+                card.style.display = (filter === 'all' || card.dataset.category === filter) ? '' : 'none';
+            });
+        }
+    });
+})();
+</script>
+{% endblock %}

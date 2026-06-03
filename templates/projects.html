@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+        color: white;
+        padding: 28px 36px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .filter-bar {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 8px 20px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #475569;
+    }
+    .filter-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+    .filter-btn.active { background: #0f766e; color: #fff; border-color: #0f766e; }
+    .project-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 20px;
+    }
+    .project-card {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        transition: all 0.3s;
+    }
+    .project-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 28px rgba(0,0,0,0.1);
+    }
+    .project-img {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        background: #f1f5f9;
+    }
+    .project-img-placeholder {
+        width: 100%;
+        height: 200px;
+        background: linear-gradient(135deg, #0f766e, #14b8a6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 60px;
+    }
+    .project-body { padding: 20px; }
+    .project-status {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 10px;
+    }
+    .status-ongoing { background: #fef3c7; color: #92400e; }
+    .status-completed { background: #dcfce7; color: #166534; }
+    .status-planned { background: #dbeafe; color: #1e40af; }
+    .project-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
+    .project-desc { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 14px; }
+    .project-meta {
+        display: flex;
+        gap: 16px;
+        font-size: 12px;
+        color: #94a3b8;
+        flex-wrap: wrap;
+    }
+    .project-meta span { display: flex; align-items: center; gap: 4px; }
+    .budget { color: #0f766e; font-weight: 700; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+</style>
+
+<div class="page-header">
+    <div>
+        <h2 style="font-size: 26px; font-weight: 700; margin-bottom: 4px;">🏗️ Barangay Projects</h2>
+        <p style="opacity: 0.85;">Track ongoing, completed, and planned infrastructure and community projects</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+</div>
+
+<div class="filter-bar" id="filterBar">
+    <button class="filter-btn active" data-filter="all">All Projects</button>
+    <button class="filter-btn" data-filter="ongoing">🔄 Ongoing</button>
+    <button class="filter-btn" data-filter="completed">✅ Completed</button>
+    <button class="filter-btn" data-filter="planned">📋 Planned</button>
+</div>
+
+<div class="project-grid" id="projectGrid">
+    <div class="loading-spinner"><div class="spinner"></div></div>
+</div>
+
+<script>
+(function() {
+    const grid = document.getElementById('projectGrid');
+    let allProjects = [];
+
+    function formatCurrency(n) {
+        return '₱' + (n || 0).toLocaleString('en-PH');
+    }
+
+    function renderProject(p) {
+        const statusClass = 'status-' + (p.status || 'planned');
+        const imgHtml = p.image_url
+            ? `<img src="${p.image_url}" alt="${escapeHtml(p.title)}" class="project-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">`
+            : '';
+        const placeholder = p.image_url
+            ? `<div class="project-img-placeholder" style="display:none;">🏗️</div>`
+            : `<div class="project-img-placeholder">🏗️</div>`;
+        return `
+        <div class="project-card" data-status="${p.status}">
+            ${imgHtml}${placeholder}
+            <div class="project-body">
+                <span class="project-status ${statusClass}">${p.status}</span>
+                <h4 class="project-title">${escapeHtml(p.title)}</h4>
+                <p class="project-desc">${escapeHtml(p.description)}</p>
+                <div class="project-meta">
+                    <span>📍 ${escapeHtml(p.location || 'Barangay-wide')}</span>
+                    <span class="budget">💰 ${formatCurrency(p.budget)}</span>
+                    ${p.start_date ? `<span>📅 ${p.start_date} → ${p.end_date || 'TBD'}</span>` : ''}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function filterProjects(status) {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`[data-filter="${status}"]`).classList.add('active');
+        document.querySelectorAll('.project-card').forEach(card => {
+            card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
+        });
+    }
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    // Load projects from API
+    fetch('/api/projects')
+        .then(r => r.json())
+        .then(data => {
+            allProjects = data.projects || [];
+            if (allProjects.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No projects found.</div>';
+                return;
+            }
+            grid.innerHTML = allProjects.map(renderProject).join('');
+        })
+        .catch(() => {
+            grid.innerHTML = '<div class="empty-state">Failed to load projects.</div>';
+        });
+
+    // Filter buttons
+    document.getElementById('filterBar').addEventListener('click', e => {
+        if (e.target.classList.contains('filter-btn')) {
+            filterProjects(e.target.dataset.filter);
+        }
+    });
+})();
+</script>
+{% endblock %}

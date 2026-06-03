@@ -1,59 +1,501 @@
 <style>
-    .interactive-card {
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border: 1px solid #e2e8f0;
+    /* ========== FEED POST CARD STYLES ========== */
+    .feed-container {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
     }
-    
-    .interactive-card:hover {
-        transform: translateY(-6px);
-        box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    .post-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #10b981;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        overflow: hidden;
+    }
+    .post-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.1);
         border-color: #0ea5e9;
     }
-    /* Card internal styles */
+    .post-card .post-header {
+        padding: 20px 24px 12px;
+    }
+    .post-card .post-body {
+        padding: 0 24px 16px;
+    }
+    .post-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
     .status-badge {
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        padding: 3px 8px;
-        border-radius: 4px;
-        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 20px;
     }
     .status-published { background: #dcfce7; color: #166534; }
-
-    /* The Smooth Interaction Effect */
-    .interactive-card {
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        border: 1px solid #e2e8f0; /* Default border */
+    .post-date {
+        font-size: 12px;
+        color: #94a3b8;
     }
-    
-    .interactive-card:hover {
-        transform: translateY(-5px); /* Lifts the card up */
-        box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); /* Deeper shadow below it */
-        border-color: #0ea5e9; /* Highlights the edge in GovKonek blue */
+    .post-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: #0f172a;
+    }
+    .post-snippet {
+        font-size: 14px;
+        color: #64748b;
+        line-height: 1.6;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .post-publisher {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 8px;
+    }
+    .post-publisher strong { color: #0056b3; }
+
+    /* Expanded state */
+    .post-card.expanded {
+        cursor: default;
+        border-left: 5px solid #0ea5e9;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+    .post-card.expanded .post-snippet {
+        display: block;
+        -webkit-line-clamp: unset;
+    }
+
+    /* Expand hint */
+    .expand-hint {
+        text-align: center;
+        font-size: 12px;
+        color: #94a3b8;
+        padding: 6px 0 2px;
+        transition: color 0.2s;
+    }
+    .post-card:hover .expand-hint { color: #0056b3; }
+    .post-card.expanded .expand-hint { display: none; }
+
+    /* ========== POST DETAIL (EXPANDED) ========== */
+    .post-detail {
+        display: none;
+        border-top: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .post-card.expanded .post-detail { display: block; }
+
+    /* Reaction bar */
+    .reaction-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        padding: 12px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        flex-wrap: wrap;
+    }
+    .reaction-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.2s;
+        font-weight: 500;
+        color: #64748b;
+    }
+    .reaction-btn:hover {
+        background: #e0f2fe;
+        border-color: #bae6fd;
+        transform: scale(1.08);
+    }
+    .reaction-btn.active {
+        background: #dbeafe;
+        border-color: #0ea5e9;
+        color: #0056b3;
+    }
+    .reaction-count {
+        font-size: 13px;
+        margin-left: 2px;
+    }
+
+    /* Comments section */
+    .comments-section {
+        padding: 16px 24px;
+    }
+    .comments-title {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 12px;
+    }
+    .comment-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .comment-item:last-child { border-bottom: none; }
+    .comment-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #0056b3;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .comment-body {
+        flex: 1;
+    }
+    .comment-author {
+        font-size: 13px;
+        font-weight: 600;
+        color: #0f172a;
+    }
+    .comment-text {
+        font-size: 14px;
+        color: #334155;
+        margin-top: 2px;
+        line-height: 1.5;
+    }
+    .comment-time {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+    .no-comments {
+        font-size: 13px;
+        color: #94a3b8;
+        text-align: center;
+        padding: 16px 0;
+    }
+
+    /* Comment input */
+    .comment-form {
+        display: flex;
+        gap: 10px;
+        padding: 12px 24px;
+        border-top: 1px solid #e2e8f0;
+        background: #fff;
+        border-radius: 0 0 12px 12px;
+    }
+    .comment-input {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 20px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+        font-family: 'Inter', sans-serif;
+    }
+    .comment-input:focus { border-color: #0ea5e9; }
+    .comment-submit {
+        background: #0056b3;
+        color: #fff;
+        border: none;
+        border-radius: 20px;
+        padding: 10px 18px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .comment-submit:hover { background: #004085; }
+
+    /* Loading spinner */
+    .loading-spinner {
+        display: flex;
+        justify-content: center;
+        padding: 24px;
+    }
+    .spinner {
+        width: 28px;
+        height: 28px;
+        border: 3px solid #e2e8f0;
+        border-top-color: #0056b3;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error state */
+    .feed-error {
+        text-align: center;
+        padding: 24px;
+        color: #ef4444;
+        font-size: 14px;
     }
 </style>
 
-<div style="display: flex; flex-direction: column; gap: 20px;">
-    
-    <div class="card interactive-card" style="border-left: 5px solid #10b981;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span class="status-badge status-published">Published</span>
-            <span style="font-size: 12px; color: #94a3b8;">March 14, 2026</span>
-        </div>
-        <h4 style="margin-bottom: 8px; font-size: 18px; font-weight: 700;">Barangay Hall Solar Panel Installation</h4>
-        <p style="font-size: 14px; color: #64748b; line-height: 1.6;">The transition to renewable energy for the main barangay hall is now 100% complete.</p>
-    </div>
-
-    <div class="card interactive-card" style="border-left: 5px solid #0ea5e9;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <span class="status-badge status-published">Published</span>
-            <span style="font-size: 12px; color: #94a3b8;">Today</span>
-        </div>
-        <h4 style="margin-bottom: 8px; font-size: 18px; font-weight: 700;">Free Dental Mission Weekend</h4>
-        <p style="font-size: 14px; color: #64748b; line-height: 1.6;">Free tooth extractions and checkups this Saturday at the Covered Court, 8AM to 12PM.</p>
-    </div>
-
+<div class="feed-container" id="feedContainer">
+    <div class="loading-spinner"><div class="spinner"></div></div>
 </div>
+
+<script>
+(function() {
+    const container = document.getElementById('feedContainer');
+    const userId = window.GOVKONEK_USER_ID;
+    const ALLOWED_EMOJI = ['👍', '❤️', '😄', '😢', '😡', '🎉'];
+
+    // Fetch and render all posts
+    async function loadFeed() {
+        try {
+            const res = await fetch('/api/posts');
+            const data = await res.json();
+            if (data.posts.length === 0) {
+                container.innerHTML = '<div class="no-comments">No announcements yet.</div>';
+                return;
+            }
+            container.innerHTML = data.posts.map(post => renderPostCard(post)).join('');
+        } catch (e) {
+            container.innerHTML = '<div class="feed-error">Failed to load posts. Please try again.</div>';
+        }
+    }
+
+    function renderPostCard(post) {
+        const dateStr = post.created_at ? formatDate(post.created_at) : '';
+        const snippet = post.content ? post.content.substring(0, 120) + (post.content.length > 120 ? '...' : '') : '';
+        return `
+        <div class="post-card" data-post-id="${post.id}">
+            <div class="post-header" onclick="expandPost(event, ${post.id})">
+                <div class="post-meta">
+                    <span class="status-badge status-published">${post.status || 'Published'}</span>
+                    <span class="post-date">${dateStr}</span>
+                </div>
+                <h4 class="post-title">${escapeHtml(post.title)}</h4>
+                <p class="post-snippet">${escapeHtml(snippet)}</p>
+                <div class="post-publisher">Posted by <strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></div>
+            </div>
+            <div class="expand-hint" onclick="expandPost(event, ${post.id})">Click to read more &amp; interact ▼</div>
+            <div class="post-detail" id="postDetail-${post.id}"></div>
+        </div>`;
+    }
+
+    // Expand/collapse a post (only triggered by header/hint clicks)
+    window.expandPost = async function(event, postId) {
+        event.stopPropagation();
+        const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+        if (!card) return;
+
+        // If already expanded, collapse it
+        if (card.classList.contains('expanded')) {
+            card.classList.remove('expanded');
+            return;
+        }
+
+        // Expand and load detail
+        card.classList.add('expanded');
+        const detailEl = document.getElementById(`postDetail-${postId}`);
+        if (detailEl && !detailEl.dataset.loaded) {
+            detailEl.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+            await loadPostDetail(postId, detailEl);
+            detailEl.dataset.loaded = 'true';
+        }
+    };
+
+    async function loadPostDetail(postId, container) {
+        try {
+            const res = await fetch(`/api/posts/${postId}`);
+            const data = await res.json();
+            container.innerHTML = renderPostDetail(data);
+        } catch (e) {
+            container.innerHTML = '<div class="feed-error">Failed to load details.</div>';
+        }
+    }
+
+    function renderPostDetail(data) {
+        const { post, comments, reaction_counts, user_reaction } = data;
+        const fullContent = escapeHtml(post.content || '');
+
+        let reactionHtml = ALLOWED_EMOJI.map(emoji => {
+            const countObj = reaction_counts.find(r => r.emoji === emoji);
+            const count = countObj ? countObj.count : 0;
+            const isActive = user_reaction === emoji ? ' active' : '';
+            return `
+            <button class="reaction-btn${isActive}" data-emoji="${emoji}"
+                    onclick="toggleReaction(event, ${post.id}, '${emoji}')">
+                ${emoji} <span class="reaction-count">${count}</span>
+            </button>`;
+        }).join('');
+
+        let commentsHtml = '';
+        if (comments && comments.length > 0) {
+            commentsHtml = comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-avatar">${(c.username || 'U')[0].toUpperCase()}</div>
+                    <div class="comment-body">
+                        <div class="comment-author">${escapeHtml(c.username || 'User')}</div>
+                        <div class="comment-text">${escapeHtml(c.content)}</div>
+                        <div class="comment-time">${timeAgo(c.created_at)}</div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            commentsHtml = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+        }
+
+        return `
+            <div class="post-body" style="padding-top:0;">
+                <p style="font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${fullContent}</p>
+            </div>
+            <div class="reaction-bar" id="reactionBar-${post.id}">
+                ${reactionHtml}
+            </div>
+            <div class="comments-section">
+                <div class="comments-title">💬 Comments (${comments ? comments.length : 0})</div>
+                <div id="commentsList-${post.id}">
+                    ${commentsHtml}
+                </div>
+            </div>
+            <form class="comment-form" onsubmit="submitComment(event, ${post.id})">
+                <input type="text" class="comment-input" placeholder="Write a comment..." maxlength="500" required>
+                <button type="submit" class="comment-submit">Post</button>
+            </form>
+        `;
+    }
+
+    // Toggle emoji reaction
+    window.toggleReaction = async function(event, postId, emoji) {
+        event.stopPropagation();
+        try {
+            const res = await fetch(`/api/posts/${postId}/react`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emoji })
+            });
+            const data = await res.json();
+            if (data.error) return;
+            updateReactionBar(postId, data.reaction_counts, data.user_reaction);
+        } catch (e) {
+            // silently fail
+        }
+    };
+
+    function updateReactionBar(postId, reactionCounts, userReaction) {
+        const bar = document.getElementById(`reactionBar-${postId}`);
+        if (!bar) return;
+
+        ALLOWED_EMOJI.forEach(emoji => {
+            const btn = bar.querySelector(`.reaction-btn[data-emoji="${emoji}"]`);
+            if (!btn) return;
+            const countObj = reactionCounts.find(r => r.emoji === emoji);
+            const count = countObj ? countObj.count : 0;
+            const countSpan = btn.querySelector('.reaction-count');
+            if (countSpan) countSpan.textContent = count;
+            if (userReaction === emoji) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    // Submit a comment
+    window.submitComment = async function(event, postId) {
+        event.preventDefault();
+        const form = event.target;
+        const input = form.querySelector('.comment-input');
+        const content = input.value.trim();
+        if (!content) return;
+
+        try {
+            const res = await fetch(`/api/posts/${postId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            const data = await res.json();
+            if (data.error) return;
+            input.value = '';
+            // Reload comments
+            await refreshComments(postId);
+        } catch (e) {
+            // silently fail
+        }
+    };
+
+    async function refreshComments(postId) {
+        try {
+            const res = await fetch(`/api/posts/${postId}/comments`);
+            const data = await res.json();
+            const list = document.getElementById(`commentsList-${postId}`);
+            if (!list) return;
+            if (data.comments.length === 0) {
+                list.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+            } else {
+                list.innerHTML = data.comments.map(c => `
+                    <div class="comment-item">
+                        <div class="comment-avatar">${(c.username || 'U')[0].toUpperCase()}</div>
+                        <div class="comment-body">
+                            <div class="comment-author">${escapeHtml(c.username || 'User')}</div>
+                            <div class="comment-text">${escapeHtml(c.content)}</div>
+                            <div class="comment-time">${timeAgo(c.created_at)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            // Update comment count in title
+            const title = document.querySelector(`#postDetail-${postId} .comments-title`);
+            if (title) title.textContent = `💬 Comments (${data.comments.length})`;
+        } catch (e) {}
+    }
+
+    // Utility functions
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function parseSqliteDate(dateStr) {
+        // SQLite CURRENT_TIMESTAMP returns 'YYYY-MM-DD HH:MM:SS' in UTC
+        if (!dateStr) return new Date();
+        // Replace space with T and append Z for UTC parsing
+        const isoStr = dateStr.replace(' ', 'T') + 'Z';
+        return new Date(isoStr);
+    }
+
+    function formatDate(dateStr) {
+        const date = parseSqliteDate(dateStr);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function timeAgo(dateStr) {
+        if (!dateStr) return '';
+        const now = new Date();
+        const date = parseSqliteDate(dateStr);
+        const diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    // Initial load
+    loadFeed();
+})();
+</script>

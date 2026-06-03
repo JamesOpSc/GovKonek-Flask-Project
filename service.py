@@ -5,93 +5,173 @@ Service Layer - ABSTRACTION PRINCIPLE
 Purpose: Service layer orchestrates business logic without being tied to Flask.
 Benefits: Easy to test, easy to reuse in different contexts (CLI, API, etc.)
 Keeps routes thin and focused on HTTP handling.
+
+REFACTORED for testability:
+    - Services accept repository instances via constructor (dependency injection).
+    - In tests, inject mock repositories to isolate business logic from the database.
+    - Static methods kept as backward-compatible wrappers around a default instance.
 """
 
 from werkzeug.security import generate_password_hash, check_password_hash
-from repository import UserRepository
+from repository import UserRepository, PostRepository
 from models import create_user_from_db
 
 
+# ===========================================================================
+# AuthService
+# ===========================================================================
+
 class AuthService:
     """
-    Service class: Encapsulates all authentication and authorization logic.
-    
-    This class demonstrates ABSTRACTION:
-        - Routes don't need to know HOW authentication works, just call the methods
-        - Database details are hidden (delegated to UserRepository)
-        - Password hashing details are hidden
-        - Business rules are centralized and easy to modify
-    
-    Design pattern: Service Layer pattern
-        - Separates business logic from HTTP/Flask concerns
-        - Easy to test independently
-        - Easy to reuse in different contexts
+    Authentication and authorization business logic.
+
+    REFACTORED: Now instance-based. Pass a UserRepository to the constructor.
+    For testing, inject a mock or an in-memory repository.
     """
-    
-    @staticmethod
-    def register_user(username, password, role):
+
+    def __init__(self, user_repo=None):
         """
-        Register a new user with validation and error handling.
-        ABSTRACTION: Routes don't care HOW registration works, just the result.
-        
-        Validation steps:
-        1. Check that all fields are provided
-        2. Check that username doesn't already exist
-        3. Hash the password using bcrypt (never store plain passwords!)
-        4. Insert into database
-        
-        @param username: Desired username (must be unique)
-        @param password: Plain-text password (will be hashed)
-        @param role: User's role ('citizen' or 'publisher')
-        @return: Tuple of (success: bool, message: str)
-                 - (True, "message") if registration succeeded
-                 - (False, "error message") if registration failed
+        @param user_repo: UserRepository instance.
+                          Defaults to a new UserRepository() if not provided.
         """
-        # Validation: Check for empty fields
+        self._user_repo = user_repo or UserRepository()
+
+    # -- public API -------------------------------------------------------
+
+    def register_user(self, username, password, role):
+        """Register a new user. Returns (success: bool, message: str)."""
         if not username or not password or not role:
             return False, "All fields are required"
-        
-        # Validation: Check if username already exists
-        if UserRepository.find_by_username(username):
+
+        if self._user_repo.find_by_username(username):
             return False, "Username already exists. Try another one."
-        
-        # Security: Hash the password using bcrypt (slow on purpose to resist brute-force attacks)
+
         hashed_password = generate_password_hash(password)
-        
-        # Attempt to create the user in database
-        if UserRepository.create(username, hashed_password, role):
+        if self._user_repo.create(username, hashed_password, role):
             return True, "Registration successful! Please log in."
-        
-        # If we get here, something went wrong in the database
         return False, "Registration failed"
-    
-    @staticmethod
-    def authenticate_user(username, password):
-        """
-        Authenticate a user by username and password.
-        ABSTRACTION: Routes don't care HOW authentication works.
-        
-        Steps:
-        1. Look up user by username
-        2. If user exists, verify password using bcrypt comparison
-        3. If password matches, create and return User object
-        4. If anything fails, return None
-        
-        @param username: Username to authenticate
-        @param password: Plain-text password to verify (will be compared with hashed version)
-        @return: Tuple of (success: bool, user: User or None)
-                 - (True, User object) if authentication succeeded
-                 - (False, None) if authentication failed
-        """
-        # Look up user in database
-        user_data = UserRepository.find_by_username(username)
-        
-        # Check if user exists AND password is correct
-        # check_password_hash safely compares plain password with bcrypt hash
+
+    def authenticate_user(self, username, password):
+        """Authenticate a user. Returns (success: bool, user: User or None)."""
+        user_data = self._user_repo.find_by_username(username)
         if user_data and check_password_hash(user_data['password_hash'], password):
-            # Create the correct User subclass based on role
             user = create_user_from_db(user_data)
             return True, user
-        
-        # Either user doesn't exist or password is wrong (we don't say which for security)
         return False, None
+
+    # AuthService: no static wrappers needed — routes use injected instances.
+    # If external code needs a default instance, create one:
+    #     from repository import UserRepository
+    #     auth = AuthService(UserRepository())
+
+
+# ===========================================================================
+# PostService
+# ===========================================================================
+
+class PostService:
+    """
+    Post, comment, and reaction business logic.
+
+    REFACTORED: Now instance-based. Pass a PostRepository to the constructor.
+    For testing, inject a mock repository.
+    """
+
+    ALLOWED_EMOJI = {'👍', '❤️', '😄', '😢', '😡', '🎉'}
+
+    def __init__(self, post_repo=None):
+        """
+        @param post_repo: PostRepository instance.
+                          Defaults to a new PostRepository() if not provided.
+        """
+        self._post_repo = post_repo or PostRepository()
+
+    # -- feed / detail ----------------------------------------------------
+
+    def get_feed(self):
+        """Get all published posts for the feed."""
+        posts = self._post_repo.get_all_posts()
+        return [dict(p) for p in posts]
+
+    def get_post_detail(self, post_id, user_id=None):
+        """Get a single post with comments, reaction counts, and user's reaction."""
+        post = self._post_repo.get_post_by_id(post_id)
+        if not post:
+            return None
+
+        return {
+            'post': dict(post),
+            'comments': [dict(c) for c in self._post_repo.get_comments_for_post(post_id)],
+            'reaction_counts': [dict(r) for r in self._post_repo.get_reactions_for_post(post_id)],
+            'user_reaction': self._post_repo.get_user_reaction(post_id, user_id) if user_id else None,
+        }
+
+    # -- comments ---------------------------------------------------------
+
+    def add_comment(self, post_id, user_id, content):
+        """Add a comment. Returns (comment_dict, error)."""
+        if not content or not content.strip():
+            return None, "Comment cannot be empty."
+        comment = self._post_repo.add_comment(post_id, user_id, content.strip())
+        return dict(comment), None
+
+    # -- reactions --------------------------------------------------------
+
+    def toggle_reaction(self, post_id, user_id, emoji):
+        """Toggle a reaction. Returns (result_dict, error)."""
+        if emoji not in self.ALLOWED_EMOJI:
+            return None, "Invalid emoji."
+
+        action, _ = self._post_repo.toggle_reaction(post_id, user_id, emoji)
+        reaction_counts = [dict(r) for r in self._post_repo.get_reactions_for_post(post_id)]
+        user_reaction = self._post_repo.get_user_reaction(post_id, user_id)
+
+        return {
+            'action': action,
+            'reaction_counts': reaction_counts,
+            'user_reaction': user_reaction,
+        }, None
+
+    # -- publisher-only post management -----------------------------------
+
+    def create_post(self, user, title, content):
+        """
+        Create a new post. ONLY publisher (barangay captain) can publish.
+        Returns (post_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can publish announcements."
+        if not title or not title.strip():
+            return None, "Title is required."
+        if not content or not content.strip():
+            return None, "Content is required."
+
+        post = self._post_repo.create_post(user.id, title.strip(), content.strip())
+        return (post, None) if post else (None, "Failed to create post.")
+
+    def update_post(self, user, post_id, title, content):
+        """
+        Update a post. ONLY the publisher who created it can edit.
+        Returns (post_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can edit announcements."
+        if not title or not title.strip():
+            return None, "Title is required."
+        if not content or not content.strip():
+            return None, "Content is required."
+
+        post = self._post_repo.update_post(post_id, user.id, title.strip(), content.strip())
+        return (post, None) if post else (None, "Post not found or you are not authorized to edit it.")
+
+    def delete_post(self, user, post_id):
+        """
+        Delete a post. ONLY the publisher who created it can delete.
+        Returns (success: bool, error).
+        """
+        if not user.can_publish():
+            return False, "Only the Barangay Captain can delete announcements."
+        self._post_repo.delete_post(post_id, user.id)
+        return True, None
+
+    # PostService: no static wrappers needed — routes use injected instances.

@@ -65,10 +65,37 @@
     <div class="brand">GovKonek</div>
     
     <div style="display: flex; flex-direction: column; gap: 10px;">
-        <a href="#" class="sidebar-link active">🏠 Home Dashboard</a>
-        <a href="#" class="sidebar-link">📄 E-Services</a>
-        <a href="#" class="sidebar-link">🗣️ Citizens' Voice</a>
+        <a href="{{ url_for('dashboard') }}" class="sidebar-link" data-page="dashboard">🏠 Home Dashboard</a>
+        <a href="{{ url_for('barangay_map') }}" class="sidebar-link" data-page="barangay_map">🗺️ Barangay Map</a>
+        <a href="{{ url_for('projects') }}" class="sidebar-link" data-page="projects">🏗️ Projects</a>
+        <a href="{{ url_for('e_services') }}" class="sidebar-link" data-page="services">📄 E-Services</a>
+        <a href="{{ url_for('documents') }}" class="sidebar-link" data-page="documents">🔍 Transparency</a>
+        <a href="#" class="sidebar-link" data-page="voice">🗣️ Citizens' Voice</a>
     </div>
+
+    <script>
+        // Highlight the active sidebar link based on the current URL
+        (function() {
+            const path = window.location.pathname;
+            const links = document.querySelectorAll('.sidebar-link[data-page]');
+            links.forEach(link => {
+                link.classList.remove('active');
+                const page = link.getAttribute('data-page');
+                if (page === 'dashboard' && (path === '/dashboard' || path === '/')) {
+                    link.classList.add('active');
+                } else if (path.includes('/' + page.replace('_', '-'))) {
+                    link.classList.add('active');
+                } else if (path === '/' + page) {
+                    link.classList.add('active');
+                }
+            });
+            // Fallback: if none matched, highlight dashboard
+            if (!document.querySelector('.sidebar-link.active')) {
+                const dash = document.querySelector('.sidebar-link[data-page="dashboard"]');
+                if (dash) dash.classList.add('active');
+            }
+        })();
+    </script>
 
     <a href="{{ url_for('logout') }}" class="btn-logout">Logout</a>
 </nav>

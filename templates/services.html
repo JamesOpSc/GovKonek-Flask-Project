@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .page-header {
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        color: white;
+        padding: 28px 36px;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .category-section {
+        margin-bottom: 28px;
+    }
+    .category-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .service-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+    .service-card {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        padding: 22px;
+        transition: all 0.3s;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        display: block;
+    }
+    .service-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(124,58,237,0.12);
+        border-color: #c4b5fd;
+    }
+    .service-icon {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 26px;
+        margin-bottom: 14px;
+        background: #f5f3ff;
+    }
+    .service-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 6px;
+    }
+    .service-desc {
+        font-size: 13px;
+        color: #64748b;
+        line-height: 1.5;
+    }
+    .service-badge {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 11px;
+        font-weight: 600;
+        color: #7c3aed;
+        background: #f5f3ff;
+        padding: 4px 10px;
+        border-radius: 12px;
+    }
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+    .quick-action {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 18px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+        font-size: 14px;
+        color: #334155;
+    }
+    .quick-action:hover {
+        background: #f5f3ff;
+        border-color: #c4b5fd;
+        color: #7c3aed;
+    }
+    .quick-action .qa-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+    .empty-state { text-align: center; padding: 40px; color: #94a3b8; }
+</style>
+
+<div class="page-header">
+    <div>
+        <h2 style="font-size: 26px; font-weight: 700; margin-bottom: 4px;">📄 E-Services</h2>
+        <p style="opacity: 0.85;">Access digital barangay services anytime, anywhere</p>
+    </div>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+</div>
+
+<!-- Quick Action Cards -->
+<div class="quick-actions">
+    <div class="quick-action" onclick="alert('📋 Redirecting to Barangay Clearance application...')">
+        <span class="qa-icon">📋</span> Request Clearance
+    </div>
+    <div class="quick-action" onclick="alert('🪪 Redirecting to Barangay ID registration...')">
+        <span class="qa-icon">🪪</span> Apply for Barangay ID
+    </div>
+    <div class="quick-action" onclick="alert('🚨 Redirecting to Blotter report form...')">
+        <span class="qa-icon">🚨</span> File a Blotter Report
+    </div>
+    <div class="quick-action" onclick="alert('📝 Redirecting to Grievance form...')">
+        <span class="qa-icon">📝</span> Submit Grievance
+    </div>
+</div>
+
+<div id="servicesContainer">
+    <div class="loading-spinner"><div class="spinner"></div></div>
+</div>
+
+<script>
+(function() {
+    const container = document.getElementById('servicesContainer');
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
+
+    fetch('/api/services')
+        .then(r => r.json())
+        .then(data => {
+            const services = data.services || [];
+            if (services.length === 0) {
+                container.innerHTML = '<div class="empty-state">No services available at this time.</div>';
+                return;
+            }
+            // Group by category
+            const grouped = {};
+            services.forEach(s => {
+                const cat = s.category || 'General';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(s);
+            });
+
+            let html = '';
+            for (const [cat, items] of Object.entries(grouped)) {
+                html += `<div class="category-section">
+                    <div class="category-title">📂 ${escapeHtml(cat)}</div>
+                    <div class="service-grid">
+                        ${items.map(s => `
+                            <a href="${s.url || '#'}" class="service-card" ${s.url === '#' ? 'onclick="alert(\'This service will be available soon!\');return false;"' : ''}>
+                                <div class="service-icon">${s.icon || '📋'}</div>
+                                <div class="service-name">${escapeHtml(s.name)}</div>
+                                <div class="service-desc">${escapeHtml(s.description)}</div>
+                                <span class="service-badge">${s.url !== '#' ? '🔗 Access Now' : '⏳ Coming Soon'}</span>
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }
+            container.innerHTML = html;
+        })
+        .catch(() => {
+            container.innerHTML = '<div class="empty-state">Failed to load services. Please try again.</div>';
+        });
+})();
+</script>
+{% endblock %}

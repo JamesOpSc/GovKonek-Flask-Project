@@ -74,7 +74,21 @@
     }
 </style>
 
+<script>
+    // Pass server-side data to JS for ALL roles
+    window.GOVKONEK_USER_ID = {{ current_user.id }};
+    window.GOVKONEK_USERNAME = "{{ current_user.username }}";
+</script>
+
 {% if role == 'publisher' %}
+
+   <div class="blue-header">
+        <div>
+            <h2 style="font-size: 28px; font-weight: 700; margin-bottom: 5px;">🏛️ Barangay Captain Portal</h2>
+            <p style="opacity: 0.9;">Welcome back, {{ name }}! Manage announcements and updates here.</p>
+        </div>
+        <a href="{{ url_for('profile') }}" class="profile-btn" title="View My Profile">👤</a>
+    </div>
 
     {% include 'components/admin_ledger.html' %}
 
