@@ -30,7 +30,7 @@ Before you begin, ensure you have the following installed:
 1. In VS Code, open a new terminal (`Ctrl` + `` ` ``).
 2. Create the virtual environment by running:
    ```
-      python -m venv venv
+   python -m venv venv
    ```
 
 3. Activate the environment:
