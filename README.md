@@ -47,7 +47,9 @@ Before you begin, ensure you have the following installed:
 
 1. With your `(venv)` active, install Flask and our project dependencies:
    ```bash
-   pip install Flask Flask-Login Werkzeug
+   pip install Flask Flask-Login Werkzeug requests
+   ```
+   > **Note:** `requests` is required for the live weather API feature.
 
 ## 🗄️ Step 4: Generate Your Local Database
 
