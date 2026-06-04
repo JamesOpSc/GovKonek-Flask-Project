@@ -11,89 +11,220 @@ REFACTORED for testability:
     - Instance methods use `self._db_path` instead of a module-level global.
     - In tests, inject `':memory:'` to get an isolated database.
     - Backward-compatible static methods delegate to a default singleton instance.
+
+OOP PRINCIPLES DEMONSTRATED:
+    - INHERITANCE: All repositories extend BaseRepository (like Vehicle → Car/Truck)
+    - ABSTRACTION: BaseRepository defines the interface; subclasses implement specifics
+    - ENCAPSULATION: _db_path is private; DBContext manages connection lifecycle
+    - EXCEPTION HANDLING: DatabaseError wraps sqlite3 errors with domain context
 """
 
 import sqlite3
+from abc import ABC
 from config import DATABASE_NAME
+from exceptions import (
+    DatabaseError, ConnectionError, RecordNotFoundError, DuplicateRecordError
+)
+
+
+# ===========================================================================
+# DBContext — Context Manager for Database Connections
+# ===========================================================================
+
+class DBContext:
+    """
+    Context manager for SQLite database connections.
+
+    From the crash course (hardware_layer.py): uses `with` for automatic
+    resource cleanup.  This implements:
+      - EXCEPTION HANDLING: Automatically rolls back on error, closes on exit
+      - RESOURCE MANAGEMENT: Guarantees connection.close() via __exit__
+      - ABSTRACTION: Hides connection lifecycle from repository methods
+
+    Usage:
+        with DBContext('govkonek.db') as db:
+            db.execute('SELECT * FROM users')
+        # connection auto-closed here
+    """
+
+    def __init__(self, db_path):
+        """
+        @param db_path: Path to the SQLite database file.
+        """
+        self._db_path = db_path
+        self._connection = None
+
+    def __enter__(self):
+        """Open the connection when entering the `with` block."""
+        try:
+            self._connection = sqlite3.connect(self._db_path)
+            self._connection.row_factory = sqlite3.Row
+            return self._connection
+        except sqlite3.Error as e:
+            raise ConnectionError(self._db_path, original_error=e)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Close the connection when leaving the `with` block.
+
+        EXCEPTION HANDLING (from lecture):
+          - If an exception occurred, roll back any uncommitted changes.
+          - Always close the connection (like `finally`).
+        """
+        if self._connection:
+            if exc_type is not None:
+                # An exception occurred — rollback to prevent partial writes
+                try:
+                    self._connection.rollback()
+                except sqlite3.Error:
+                    pass  # connection may already be broken
+            self._connection.close()
+        # Return False so exceptions propagate (don't suppress them)
+        return False
 
 
 # ---------------------------------------------------------------------------
-# Helper: shared connection factory (not tied to any class)
+# Legacy: shared connection factory (kept for backward compatibility)
 # ---------------------------------------------------------------------------
 
 def _connect(db_path):
-    """Create a connection with Row factory enabled."""
+    """Create a connection with Row factory enabled. Legacy helper."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 # ===========================================================================
-# UserRepository
+# BaseRepository — Abstract Base for All Repositories
 # ===========================================================================
 
-class UserRepository:
+class BaseRepository(ABC):
     """
-    Repository for user-related database operations.
+    Abstract base class for all repository classes.
 
-    REFACTORED: Now instance-based. Pass `db_path` to the constructor.
-    For backward compatibility, static methods still work using the default
-    module-level singleton `_default_user_repo`.
+    INHERITANCE (from lecture): Just like Vehicle is the base class for
+    Car, Truck, Motorcycle, this BaseRepository is the base for
+    UserRepository, PostRepository, ProjectRepository, etc.
+
+    Benefits:
+      - DRY: __init__ and _get_db are defined ONCE, not 6 times
+      - CONSISTENT: All repos use the same connection pattern
+      - TESTABLE: db_path injection works identically for all repos
+      - EXTENSIBLE: Add new repository by subclassing, not copy-pasting
+
+    Subclasses only need to implement their domain-specific methods.
     """
 
     def __init__(self, db_path=None):
         """
+        Initialize the repository with an injectable database path.
+
         @param db_path: Path to SQLite database file.
                         Defaults to config.DATABASE_NAME.
                         Use ':memory:' for isolated testing.
         """
         self._db_path = db_path or DATABASE_NAME
 
-    # -- connection helper ------------------------------------------------
+    # -- connection management -------------------------------------------
 
     def _get_db(self):
-        """Create and return a new database connection."""
+        """
+        Create and return a new database connection.
+
+        All subclasses inherit this method — no need to redefine it.
+        This is INHERITANCE in action: shared behavior defined once.
+        """
         return _connect(self._db_path)
+
+    def _execute(self, query, params=(), fetch='all', commit=False):
+        """
+        Execute a query with automatic exception handling.
+
+        EXCEPTION HANDLING (from lecture): Wraps sqlite3 errors in
+        domain-specific DatabaseError, providing meaningful context.
+
+        @param query: SQL query string
+        @param params: Query parameters tuple
+        @param fetch: 'all', 'one', or None (for INSERT/UPDATE/DELETE)
+        @param commit: If True, commit after executing
+        @return: Fetched rows, or cursor for non-fetch operations
+        """
+        conn = self._get_db()
+        try:
+            cursor = conn.execute(query, params)
+            if commit:
+                conn.commit()
+            if fetch == 'all':
+                return cursor.fetchall()
+            elif fetch == 'one':
+                return cursor.fetchone()
+            return cursor
+        except sqlite3.IntegrityError as e:
+            raise DuplicateRecordError(
+                entity='record', field='constraint', value=str(params)
+            ) from e
+        except sqlite3.Error as e:
+            raise DatabaseError(
+                f"Query failed: {query[:80]}...", original_error=e
+            ) from e
+        finally:
+            conn.close()
+
+    def _execute_write(self, query, params=()):
+        """
+        Execute a write query (INSERT/UPDATE/DELETE) and commit.
+        Returns the cursor for accessing lastrowid.
+        """
+        return self._execute(query, params, fetch=None, commit=True)
+
+
+# ===========================================================================
+# UserRepository
+# ===========================================================================
+
+class UserRepository(BaseRepository):
+    """
+    Repository for user-related database operations.
+
+    INHERITANCE: Extends BaseRepository — inherits __init__, _get_db,
+    _execute, and _execute_write. Only defines user-specific queries.
+
+    REFACTORED: Now instance-based. Pass `db_path` to the constructor.
+    For backward compatibility, static methods still work using the default
+    module-level singleton `_default_user_repo`.
+    """
 
     # -- user CRUD --------------------------------------------------------
 
     def find_by_id(self, user_id):
         """Fetch a user by their ID."""
-        conn = self._get_db()
-        user_data = conn.execute(
-            'SELECT * FROM users WHERE id = ?', (user_id,)
-        ).fetchone()
-        conn.close()
-        return user_data
+        return self._execute(
+            'SELECT * FROM users WHERE id = ?', (user_id,), fetch='one'
+        )
 
     def find_by_username(self, username):
         """Fetch a user by their username."""
-        conn = self._get_db()
-        user_data = conn.execute(
-            'SELECT * FROM users WHERE username = ?', (username,)
-        ).fetchone()
-        conn.close()
-        return user_data
+        return self._execute(
+            'SELECT * FROM users WHERE username = ?', (username,), fetch='one'
+        )
 
     def create(self, username, hashed_password, role):
-        """Insert a new user. Returns True on success, False on duplicate."""
-        conn = self._get_db()
+        """
+        Insert a new user. Returns True on success, False on duplicate.
+
+        EXCEPTION HANDLING: Catches DuplicateRecordError for duplicate usernames
+        instead of letting raw sqlite3.IntegrityError propagate.
+        """
         try:
-            conn.execute(
+            self._execute_write(
                 'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
                 (username, hashed_password, role)
             )
-            conn.commit()
             return True
-        except sqlite3.IntegrityError:
+        except DuplicateRecordError:
             return False
-        finally:
-            conn.close()
 
     # -- backward-compatible static interface -----------------------------
-    # Only static methods that DON'T shadow instance methods are kept here.
-    # Instance methods (find_by_id, find_by_username, create) are the
-    # primary API.  Routes use injected instances via current_app.extensions.
 
     @staticmethod
     def get_db_connection():
@@ -105,76 +236,50 @@ class UserRepository:
 # PostRepository
 # ===========================================================================
 
-class PostRepository:
+class PostRepository(BaseRepository):
     """
     Repository for post, comment, and reaction database operations.
 
-    REFACTORED: Now instance-based. Pass `db_path` to the constructor.
-    Static methods are kept as thin wrappers around a default instance.
+    INHERITANCE: Extends BaseRepository — inherits __init__, _get_db,
+    _execute, and _execute_write.
     """
-
-    def __init__(self, db_path=None):
-        """
-        @param db_path: Path to SQLite database file.
-                        Defaults to config.DATABASE_NAME.
-                        Use ':memory:' for isolated testing.
-        """
-        self._db_path = db_path or DATABASE_NAME
-
-    def _get_db(self):
-        return _connect(self._db_path)
 
     # -- post CRUD --------------------------------------------------------
 
     def create_post(self, publisher_id, title, content, category='Announcement', status='published'):
         """Create a new post. Returns the created post as a dict."""
-        conn = self._get_db()
-        try:
-            cursor = conn.execute(
-                'INSERT INTO posts (publisher_id, title, content, category, status) VALUES (?, ?, ?, ?, ?)',
-                (publisher_id, title, content, category, status)
-            )
-            conn.commit()
-            post_id = cursor.lastrowid
-            post = conn.execute('''
-                SELECT p.*, u.username as publisher_name
-                FROM posts p JOIN users u ON p.publisher_id = u.id
-                WHERE p.id = ?
-            ''', (post_id,)).fetchone()
-            return dict(post) if post else None
-        finally:
-            conn.close()
+        cursor = self._execute_write(
+            'INSERT INTO posts (publisher_id, title, content, category, status) VALUES (?, ?, ?, ?, ?)',
+            (publisher_id, title, content, category, status)
+        )
+        post_id = cursor.lastrowid
+        post = self._execute('''
+            SELECT p.*, u.username as publisher_name
+            FROM posts p JOIN users u ON p.publisher_id = u.id
+            WHERE p.id = ?
+        ''', (post_id,), fetch='one')
+        return dict(post) if post else None
 
     def update_post(self, post_id, publisher_id, title, content):
         """Update a post. Only the owning publisher can update."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                'UPDATE posts SET title = ?, content = ? WHERE id = ? AND publisher_id = ?',
-                (title, content, post_id, publisher_id)
-            )
-            conn.commit()
-            post = conn.execute('''
-                SELECT p.*, u.username as publisher_name
-                FROM posts p JOIN users u ON p.publisher_id = u.id
-                WHERE p.id = ?
-            ''', (post_id,)).fetchone()
-            return dict(post) if post else None
-        finally:
-            conn.close()
+        self._execute_write(
+            'UPDATE posts SET title = ?, content = ? WHERE id = ? AND publisher_id = ?',
+            (title, content, post_id, publisher_id)
+        )
+        post = self._execute('''
+            SELECT p.*, u.username as publisher_name
+            FROM posts p JOIN users u ON p.publisher_id = u.id
+            WHERE p.id = ?
+        ''', (post_id,), fetch='one')
+        return dict(post) if post else None
 
     def delete_post(self, post_id, publisher_id):
         """Delete a post. Only the owning publisher can delete."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                'DELETE FROM posts WHERE id = ? AND publisher_id = ?',
-                (post_id, publisher_id)
-            )
-            conn.commit()
-            return True
-        finally:
-            conn.close()
+        self._execute_write(
+            'DELETE FROM posts WHERE id = ? AND publisher_id = ?',
+            (post_id, publisher_id)
+        )
+        return True
 
     def get_all_posts(self, search=None, category=None, sort='newest'):
         """
@@ -186,8 +291,6 @@ class PostRepository:
         @param sort: Sort order — 'newest' (default), 'oldest', 'title'.
         @return: List of sqlite3.Row objects.
         """
-        conn = self._get_db()
-
         query = '''
             SELECT p.*, u.username as publisher_name
             FROM posts p
@@ -214,80 +317,61 @@ class PostRepository:
         order_clause = sort_map.get(sort, 'p.created_at DESC')
         query += f' ORDER BY {order_clause}'
 
-        posts = conn.execute(query, params).fetchall()
-        conn.close()
-        return posts
+        return self._execute(query, tuple(params), fetch='all')
 
     def get_post_by_id(self, post_id):
         """Fetch a single post by ID."""
-        conn = self._get_db()
-        post = conn.execute('''
+        return self._execute('''
             SELECT p.*, u.username as publisher_name
             FROM posts p
             JOIN users u ON p.publisher_id = u.id
             WHERE p.id = ?
-        ''', (post_id,)).fetchone()
-        conn.close()
-        return post
+        ''', (post_id,), fetch='one')
 
     # -- comments ---------------------------------------------------------
 
     def get_comments_for_post(self, post_id):
         """Fetch all comments for a post with usernames."""
-        conn = self._get_db()
-        comments = conn.execute('''
+        return self._execute('''
             SELECT c.*, u.username
             FROM comments c
             JOIN users u ON c.user_id = u.id
             WHERE c.post_id = ?
             ORDER BY c.created_at ASC
-        ''', (post_id,)).fetchall()
-        conn.close()
-        return comments
+        ''', (post_id,), fetch='all')
 
     def add_comment(self, post_id, user_id, content):
         """Add a comment. Returns the new comment as a Row."""
-        conn = self._get_db()
-        try:
-            cursor = conn.execute(
-                'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
-                (post_id, user_id, content)
-            )
-            conn.commit()
-            comment_id = cursor.lastrowid
-            comment = conn.execute('''
-                SELECT c.*, u.username
-                FROM comments c
-                JOIN users u ON c.user_id = u.id
-                WHERE c.id = ?
-            ''', (comment_id,)).fetchone()
-            return comment
-        finally:
-            conn.close()
+        cursor = self._execute_write(
+            'INSERT INTO comments (post_id, user_id, content) VALUES (?, ?, ?)',
+            (post_id, user_id, content)
+        )
+        comment_id = cursor.lastrowid
+        return self._execute('''
+            SELECT c.*, u.username
+            FROM comments c
+            JOIN users u ON c.user_id = u.id
+            WHERE c.id = ?
+        ''', (comment_id,), fetch='one')
 
     # -- reactions --------------------------------------------------------
 
     def get_reactions_for_post(self, post_id):
         """Fetch aggregated emoji counts for a post."""
-        conn = self._get_db()
-        counts = conn.execute('''
+        return self._execute('''
             SELECT emoji, COUNT(*) as count
             FROM reactions
             WHERE post_id = ?
             GROUP BY emoji
             ORDER BY count DESC
-        ''', (post_id,)).fetchall()
-        conn.close()
-        return counts
+        ''', (post_id,), fetch='all')
 
     def get_user_reaction(self, post_id, user_id):
         """Get the emoji a specific user reacted with, or None."""
-        conn = self._get_db()
-        reaction = conn.execute(
+        reaction = self._execute(
             'SELECT emoji FROM reactions WHERE post_id = ? AND user_id = ?',
-            (post_id, user_id)
-        ).fetchone()
-        conn.close()
+            (post_id, user_id), fetch='one'
+        )
         return reaction['emoji'] if reaction else None
 
     def toggle_reaction(self, post_id, user_id, emoji):
@@ -297,37 +381,31 @@ class PostRepository:
           - different   → update   (returns 'changed')
           - none        → add      (returns 'added')
         """
-        conn = self._get_db()
-        try:
-            existing = conn.execute(
-                'SELECT id, emoji FROM reactions WHERE post_id = ? AND user_id = ?',
-                (post_id, user_id)
-            ).fetchone()
+        existing = self._execute(
+            'SELECT id, emoji FROM reactions WHERE post_id = ? AND user_id = ?',
+            (post_id, user_id), fetch='one'
+        )
 
-            if existing:
-                if existing['emoji'] == emoji:
-                    conn.execute('DELETE FROM reactions WHERE id = ?', (existing['id'],))
-                    conn.commit()
-                    return 'removed', emoji
-                else:
-                    conn.execute(
-                        'UPDATE reactions SET emoji = ? WHERE id = ?',
-                        (emoji, existing['id'])
-                    )
-                    conn.commit()
-                    return 'changed', emoji
-            else:
-                conn.execute(
-                    'INSERT INTO reactions (post_id, user_id, emoji) VALUES (?, ?, ?)',
-                    (post_id, user_id, emoji)
+        if existing:
+            if existing['emoji'] == emoji:
+                self._execute_write(
+                    'DELETE FROM reactions WHERE id = ?', (existing['id'],)
                 )
-                conn.commit()
-                return 'added', emoji
-        finally:
-            conn.close()
+                return 'removed', emoji
+            else:
+                self._execute_write(
+                    'UPDATE reactions SET emoji = ? WHERE id = ?',
+                    (emoji, existing['id'])
+                )
+                return 'changed', emoji
+        else:
+            self._execute_write(
+                'INSERT INTO reactions (post_id, user_id, emoji) VALUES (?, ?, ?)',
+                (post_id, user_id, emoji)
+            )
+            return 'added', emoji
 
     # -- backward-compatible static interface -----------------------------
-    # Only static methods that DON'T shadow instance methods are kept here.
 
     @staticmethod
     def get_db_connection():
@@ -339,191 +417,143 @@ class PostRepository:
 # ProjectRepository
 # ===========================================================================
 
-class ProjectRepository:
-    """Repository for barangay project operations."""
+class ProjectRepository(BaseRepository):
+    """
+    Repository for barangay project operations.
 
-    def __init__(self, db_path=None):
-        self._db_path = db_path or DATABASE_NAME
-
-    def _get_db(self):
-        return _connect(self._db_path)
+    INHERITANCE: Extends BaseRepository — inherits __init__, _get_db,
+    _execute, and _execute_write.
+    """
 
     def get_all(self):
-        conn = self._get_db()
-        projects = conn.execute(
-            'SELECT * FROM projects ORDER BY created_at DESC'
-        ).fetchall()
-        conn.close()
-        return [dict(p) for p in projects]
+        return [dict(p) for p in self._execute(
+            'SELECT * FROM projects ORDER BY created_at DESC', fetch='all'
+        )]
 
     def get_by_status(self, status):
-        conn = self._get_db()
-        projects = conn.execute(
+        return [dict(p) for p in self._execute(
             'SELECT * FROM projects WHERE status = ? ORDER BY created_at DESC',
-            (status,)
-        ).fetchall()
-        conn.close()
-        return [dict(p) for p in projects]
+            (status,), fetch='all'
+        )]
 
     def get_by_id(self, project_id):
-        conn = self._get_db()
-        project = conn.execute(
-            'SELECT * FROM projects WHERE id = ?', (project_id,)
-        ).fetchone()
-        conn.close()
+        project = self._execute(
+            'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'
+        )
         return dict(project) if project else None
 
     def create(self, title, description, status='ongoing', budget=0,
                location='', image_url='', start_date='', end_date='', publisher_id=None):
         """Create a new project. Returns the created project as a dict."""
-        conn = self._get_db()
-        try:
-            cursor = conn.execute(
-                '''INSERT INTO projects
-                   (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
-            )
-            conn.commit()
-            project_id = cursor.lastrowid
-            project = conn.execute(
-                'SELECT * FROM projects WHERE id = ?', (project_id,)
-            ).fetchone()
-            return dict(project) if project else None
-        finally:
-            conn.close()
+        cursor = self._execute_write(
+            '''INSERT INTO projects
+               (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
+        )
+        project = self._execute(
+            'SELECT * FROM projects WHERE id = ?', (cursor.lastrowid,), fetch='one'
+        )
+        return dict(project) if project else None
 
     def update(self, project_id, publisher_id, title, description, status,
                budget, location, image_url, start_date, end_date):
         """Update a project. Only the owning publisher can update. Returns updated project or None."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                '''UPDATE projects
-                   SET title = ?, description = ?, status = ?, budget = ?,
-                       location = ?, image_url = ?, start_date = ?, end_date = ?
-                   WHERE id = ? AND publisher_id = ?''',
-                (title, description, status, budget, location, image_url,
-                 start_date, end_date, project_id, publisher_id)
-            )
-            conn.commit()
-            project = conn.execute(
-                'SELECT * FROM projects WHERE id = ?', (project_id,)
-            ).fetchone()
-            return dict(project) if project else None
-        finally:
-            conn.close()
+        self._execute_write(
+            '''UPDATE projects
+               SET title = ?, description = ?, status = ?, budget = ?,
+                   location = ?, image_url = ?, start_date = ?, end_date = ?
+               WHERE id = ? AND publisher_id = ?''',
+            (title, description, status, budget, location, image_url,
+             start_date, end_date, project_id, publisher_id)
+        )
+        project = self._execute(
+            'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'
+        )
+        return dict(project) if project else None
 
     def delete(self, project_id, publisher_id):
         """Delete a project. Only the owning publisher can delete."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                'DELETE FROM projects WHERE id = ? AND publisher_id = ?',
-                (project_id, publisher_id)
-            )
-            conn.commit()
-            return True
-        finally:
-            conn.close()
+        self._execute_write(
+            'DELETE FROM projects WHERE id = ? AND publisher_id = ?',
+            (project_id, publisher_id)
+        )
+        return True
 
 
 # ===========================================================================
 # ServiceRepository
 # ===========================================================================
 
-class ServiceRepository:
-    """Repository for e-services operations."""
+class ServiceRepository(BaseRepository):
+    """
+    Repository for e-services operations.
 
-    def __init__(self, db_path=None):
-        self._db_path = db_path or DATABASE_NAME
-
-    def _get_db(self):
-        return _connect(self._db_path)
+    INHERITANCE: Extends BaseRepository.
+    """
 
     def get_all(self):
-        conn = self._get_db()
-        services = conn.execute(
-            'SELECT * FROM services WHERE is_active = 1 ORDER BY category, name'
-        ).fetchall()
-        conn.close()
-        return [dict(s) for s in services]
+        return [dict(s) for s in self._execute(
+            'SELECT * FROM services WHERE is_active = 1 ORDER BY category, name',
+            fetch='all'
+        )]
 
     def get_by_category(self, category):
-        conn = self._get_db()
-        services = conn.execute(
+        return [dict(s) for s in self._execute(
             'SELECT * FROM services WHERE category = ? AND is_active = 1 ORDER BY name',
-            (category,)
-        ).fetchall()
-        conn.close()
-        return [dict(s) for s in services]
+            (category,), fetch='all'
+        )]
 
     def get_categories(self):
-        conn = self._get_db()
-        cats = conn.execute(
-            'SELECT DISTINCT category FROM services WHERE is_active = 1 ORDER BY category'
-        ).fetchall()
-        conn.close()
-        return [c['category'] for c in cats]
+        return [c['category'] for c in self._execute(
+            'SELECT DISTINCT category FROM services WHERE is_active = 1 ORDER BY category',
+            fetch='all'
+        )]
 
 
 # ===========================================================================
 # DocumentRepository
 # ===========================================================================
 
-class DocumentRepository:
-    """Repository for transparency document operations."""
+class DocumentRepository(BaseRepository):
+    """
+    Repository for transparency document operations.
 
-    def __init__(self, db_path=None):
-        self._db_path = db_path or DATABASE_NAME
-
-    def _get_db(self):
-        return _connect(self._db_path)
+    INHERITANCE: Extends BaseRepository.
+    """
 
     def get_all(self):
-        conn = self._get_db()
-        docs = conn.execute(
-            'SELECT * FROM documents ORDER BY published_date DESC'
-        ).fetchall()
-        conn.close()
-        return [dict(d) for d in docs]
+        return [dict(d) for d in self._execute(
+            'SELECT * FROM documents ORDER BY published_date DESC', fetch='all'
+        )]
 
     def get_by_category(self, category):
-        conn = self._get_db()
-        docs = conn.execute(
+        return [dict(d) for d in self._execute(
             'SELECT * FROM documents WHERE category = ? ORDER BY published_date DESC',
-            (category,)
-        ).fetchall()
-        conn.close()
-        return [dict(d) for d in docs]
+            (category,), fetch='all'
+        )]
 
     def get_categories(self):
-        conn = self._get_db()
-        cats = conn.execute(
-            'SELECT DISTINCT category FROM documents ORDER BY category'
-        ).fetchall()
-        conn.close()
-        return [c['category'] for c in cats]
+        return [c['category'] for c in self._execute(
+            'SELECT DISTINCT category FROM documents ORDER BY category', fetch='all'
+        )]
 
 
 # ===========================================================================
 # VoiceRepository — Citizens' Voice forum
 # ===========================================================================
 
-class VoiceRepository:
-    """Repository for Citizens' Voice forum operations."""
+class VoiceRepository(BaseRepository):
+    """
+    Repository for Citizens' Voice forum operations.
 
-    def __init__(self, db_path=None):
-        self._db_path = db_path or DATABASE_NAME
-
-    def _get_db(self):
-        return _connect(self._db_path)
+    INHERITANCE: Extends BaseRepository.
+    """
 
     # -- voice posts CRUD ------------------------------------------------
 
     def get_all(self, category=None, status=None):
         """Fetch all voice posts with author names, newest first. Optional filters."""
-        conn = self._get_db()
         query = '''
             SELECT vp.*, u.username as author_name, u.role as author_role,
                    (SELECT COUNT(*) FROM voice_comments vc WHERE vc.voice_post_id = vp.id) as comment_count
@@ -539,123 +569,89 @@ class VoiceRepository:
             query += ' AND vp.status = ?'
             params.append(status)
         query += ' ORDER BY vp.created_at DESC'
-        posts = conn.execute(query, params).fetchall()
-        conn.close()
-        return [dict(p) for p in posts]
+        return [dict(p) for p in self._execute(query, tuple(params), fetch='all')]
 
     def get_by_id(self, voice_post_id):
         """Fetch a single voice post with author info."""
-        conn = self._get_db()
-        post = conn.execute('''
+        post = self._execute('''
             SELECT vp.*, u.username as author_name, u.role as author_role,
                    (SELECT COUNT(*) FROM voice_comments vc WHERE vc.voice_post_id = vp.id) as comment_count
             FROM voice_posts vp
             JOIN users u ON vp.user_id = u.id
             WHERE vp.id = ?
-        ''', (voice_post_id,)).fetchone()
-        conn.close()
+        ''', (voice_post_id,), fetch='one')
         return dict(post) if post else None
 
     def create(self, user_id, title, content, category='General'):
         """Create a new voice post. Returns the created post as a dict."""
-        conn = self._get_db()
-        try:
-            cursor = conn.execute(
-                'INSERT INTO voice_posts (user_id, title, content, category) VALUES (?, ?, ?, ?)',
-                (user_id, title, content, category)
-            )
-            conn.commit()
-            post_id = cursor.lastrowid
-            post = conn.execute('''
-                SELECT vp.*, u.username as author_name, u.role as author_role, 0 as comment_count
-                FROM voice_posts vp
-                JOIN users u ON vp.user_id = u.id
-                WHERE vp.id = ?
-            ''', (post_id,)).fetchone()
-            return dict(post) if post else None
-        finally:
-            conn.close()
+        cursor = self._execute_write(
+            'INSERT INTO voice_posts (user_id, title, content, category) VALUES (?, ?, ?, ?)',
+            (user_id, title, content, category)
+        )
+        post = self._execute('''
+            SELECT vp.*, u.username as author_name, u.role as author_role, 0 as comment_count
+            FROM voice_posts vp
+            JOIN users u ON vp.user_id = u.id
+            WHERE vp.id = ?
+        ''', (cursor.lastrowid,), fetch='one')
+        return dict(post) if post else None
 
     def update_status(self, voice_post_id, status):
         """Update the status of a voice post (open/resolved/closed)."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                'UPDATE voice_posts SET status = ? WHERE id = ?',
-                (status, voice_post_id)
-            )
-            conn.commit()
-            return True
-        finally:
-            conn.close()
+        self._execute_write(
+            'UPDATE voice_posts SET status = ? WHERE id = ?',
+            (status, voice_post_id)
+        )
+        return True
 
     def delete(self, voice_post_id, user_id):
         """Delete a voice post. Only the author can delete."""
-        conn = self._get_db()
-        try:
-            conn.execute(
-                'DELETE FROM voice_posts WHERE id = ? AND user_id = ?',
-                (voice_post_id, user_id)
-            )
-            conn.commit()
-            return True
-        finally:
-            conn.close()
+        self._execute_write(
+            'DELETE FROM voice_posts WHERE id = ? AND user_id = ?',
+            (voice_post_id, user_id)
+        )
+        return True
 
     def get_categories(self):
         """Get distinct categories used in voice posts."""
-        conn = self._get_db()
-        cats = conn.execute(
-            'SELECT DISTINCT category FROM voice_posts ORDER BY category'
-        ).fetchall()
-        conn.close()
-        return [c['category'] for c in cats]
+        return [c['category'] for c in self._execute(
+            'SELECT DISTINCT category FROM voice_posts ORDER BY category', fetch='all'
+        )]
 
     # -- voice comments --------------------------------------------------
 
     def get_comments(self, voice_post_id):
         """Fetch all comments for a voice post with author info."""
-        conn = self._get_db()
-        comments = conn.execute('''
+        return [dict(c) for c in self._execute('''
             SELECT vc.*, u.username as author_name, u.role as author_role
             FROM voice_comments vc
             JOIN users u ON vc.user_id = u.id
             WHERE vc.voice_post_id = ?
             ORDER BY vc.created_at ASC
-        ''', (voice_post_id,)).fetchall()
-        conn.close()
-        return [dict(c) for c in comments]
+        ''', (voice_post_id,), fetch='all')]
 
     def add_comment(self, voice_post_id, user_id, content, is_official=False):
         """Add a comment to a voice post. Returns the new comment as a dict."""
-        conn = self._get_db()
-        try:
-            cursor = conn.execute(
-                'INSERT INTO voice_comments (voice_post_id, user_id, content, is_official) VALUES (?, ?, ?, ?)',
-                (voice_post_id, user_id, content, 1 if is_official else 0)
-            )
-            conn.commit()
-            comment_id = cursor.lastrowid
-            comment = conn.execute('''
-                SELECT vc.*, u.username as author_name, u.role as author_role
-                FROM voice_comments vc
-                JOIN users u ON vc.user_id = u.id
-                WHERE vc.id = ?
-            ''', (comment_id,)).fetchone()
-            return dict(comment) if comment else None
-        finally:
-            conn.close()
+        cursor = self._execute_write(
+            'INSERT INTO voice_comments (voice_post_id, user_id, content, is_official) VALUES (?, ?, ?, ?)',
+            (voice_post_id, user_id, content, 1 if is_official else 0)
+        )
+        comment = self._execute('''
+            SELECT vc.*, u.username as author_name, u.role as author_role
+            FROM voice_comments vc
+            JOIN users u ON vc.user_id = u.id
+            WHERE vc.id = ?
+        ''', (cursor.lastrowid,), fetch='one')
+        return dict(comment) if comment else None
 
     # -- voice votes -----------------------------------------------------
 
     def get_user_vote(self, voice_post_id, user_id):
         """Get the vote type a user cast on a voice post, or None."""
-        conn = self._get_db()
-        vote = conn.execute(
+        vote = self._execute(
             'SELECT vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
-            (voice_post_id, user_id)
-        ).fetchone()
-        conn.close()
+            (voice_post_id, user_id), fetch='one'
+        )
         return vote['vote_type'] if vote else None
 
     def toggle_vote(self, voice_post_id, user_id, vote_type):
@@ -666,49 +662,44 @@ class VoiceRepository:
           - none          → add    (returns 'added')
         Returns (action, net_change) where net_change is the delta to apply to vote_count.
         """
-        conn = self._get_db()
-        try:
-            existing = conn.execute(
-                'SELECT id, vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
-                (voice_post_id, user_id)
-            ).fetchone()
+        existing = self._execute(
+            'SELECT id, vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
+            (voice_post_id, user_id), fetch='one'
+        )
 
-            if existing:
-                if existing['vote_type'] == vote_type:
-                    # Remove vote
-                    conn.execute('DELETE FROM voice_votes WHERE id = ?', (existing['id'],))
-                    delta = -1 if vote_type == 'up' else 1
-                    conn.execute(
-                        'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
-                        (delta, voice_post_id)
-                    )
-                    conn.commit()
-                    return 'removed', delta
-                else:
-                    # Change vote
-                    conn.execute(
-                        'UPDATE voice_votes SET vote_type = ? WHERE id = ?',
-                        (vote_type, existing['id'])
-                    )
-                    delta = 2 if vote_type == 'up' else -2
-                    conn.execute(
-                        'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
-                        (delta, voice_post_id)
-                    )
-                    conn.commit()
-                    return 'changed', delta
-            else:
-                # Add vote
-                conn.execute(
-                    'INSERT INTO voice_votes (voice_post_id, user_id, vote_type) VALUES (?, ?, ?)',
-                    (voice_post_id, user_id, vote_type)
+        if existing:
+            if existing['vote_type'] == vote_type:
+                # Remove vote
+                self._execute_write(
+                    'DELETE FROM voice_votes WHERE id = ?', (existing['id'],)
                 )
-                delta = 1 if vote_type == 'up' else -1
-                conn.execute(
+                delta = -1 if vote_type == 'up' else 1
+                self._execute_write(
                     'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
                     (delta, voice_post_id)
                 )
-                conn.commit()
-                return 'added', delta
-        finally:
-            conn.close()
+                return 'removed', delta
+            else:
+                # Change vote
+                self._execute_write(
+                    'UPDATE voice_votes SET vote_type = ? WHERE id = ?',
+                    (vote_type, existing['id'])
+                )
+                delta = 2 if vote_type == 'up' else -2
+                self._execute_write(
+                    'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
+                    (delta, voice_post_id)
+                )
+                return 'changed', delta
+        else:
+            # Add new vote
+            self._execute_write(
+                'INSERT INTO voice_votes (voice_post_id, user_id, vote_type) VALUES (?, ?, ?)',
+                (voice_post_id, user_id, vote_type)
+            )
+            delta = 1 if vote_type == 'up' else -1
+            self._execute_write(
+                'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
+                (delta, voice_post_id)
+            )
+            return 'added', delta
