@@ -74,9 +74,17 @@ def create_database():
             image_url TEXT DEFAULT '',
             start_date TEXT DEFAULT '',
             end_date TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            publisher_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (publisher_id) REFERENCES users(id)
         )
     ''')
+
+    # -- Migration: add publisher_id column if it doesn't exist ----------
+    try:
+        cursor.execute("ALTER TABLE projects ADD COLUMN publisher_id INTEGER REFERENCES users(id)")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     # -- E-Services -----------------------------------------------------
     cursor.execute('''

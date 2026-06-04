@@ -17,6 +17,7 @@
         gap: 10px;
         margin-bottom: 24px;
         flex-wrap: wrap;
+        align-items: center;
     }
     .filter-btn {
         padding: 8px 20px;
@@ -42,6 +43,7 @@
         border: 1px solid #e2e8f0;
         overflow: hidden;
         transition: all 0.3s;
+        position: relative;
     }
     .project-card:hover {
         transform: translateY(-4px);
@@ -88,6 +90,143 @@
     .project-meta span { display: flex; align-items: center; gap: 4px; }
     .budget { color: #0f766e; font-weight: 700; }
     .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+
+    /* Publisher action buttons */
+    .project-actions {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 6px;
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    .project-card:hover .project-actions { opacity: 1; }
+    .btn-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        background: rgba(255,255,255,0.9);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .btn-icon.edit { color: #0ea5e9; }
+    .btn-icon.edit:hover { background: #0ea5e9; color: #fff; }
+    .btn-icon.delete { color: #ef4444; }
+    .btn-icon.delete:hover { background: #ef4444; color: #fff; }
+
+    .btn-new-project {
+        background: rgba(255,255,255,0.2);
+        color: #fff;
+        border: 2px dashed rgba(255,255,255,0.5);
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 14px;
+    }
+    .btn-new-project:hover { background: rgba(255,255,255,0.3); border-color: #fff; }
+
+    /* Modal */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+        background: #fff;
+        border-radius: 16px;
+        padding: 32px;
+        width: 90%;
+        max-width: 560px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal h3 { font-size: 20px; margin-bottom: 20px; color: #0f172a; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 5px;
+    }
+    .form-group input, .form-group textarea, .form-group select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+        outline: none;
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+    }
+    .btn-cancel {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        color: #475569;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-save {
+        padding: 10px 24px;
+        border-radius: 8px;
+        border: none;
+        background: #0f766e;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-save:hover { background: #115e59; }
+    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .toast {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        padding: 14px 24px;
+        border-radius: 10px;
+        color: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        z-index: 2000;
+        animation: slideUp 0.3s ease;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    }
+    .toast.success { background: #10b981; }
+    .toast.error { background: #ef4444; }
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
 </style>
 
 <div class="page-header">
@@ -95,7 +234,12 @@
         <h2 style="font-size: 26px; font-weight: 700; margin-bottom: 4px;">🏗️ Barangay Projects</h2>
         <p style="opacity: 0.85;">Track ongoing, completed, and planned infrastructure and community projects</p>
     </div>
-    <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+    <div style="display:flex; gap:10px; align-items:center;">
+        {% if role == 'publisher' %}
+        <button class="btn-new-project" onclick="openProjectModal()">+ New Project</button>
+        {% endif %}
+        <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+    </div>
 </div>
 
 <div class="filter-bar" id="filterBar">
@@ -109,9 +253,65 @@
     <div class="loading-spinner"><div class="spinner"></div></div>
 </div>
 
+<!-- CREATE / EDIT MODAL -->
+<div class="modal-overlay" id="projectModalOverlay">
+    <div class="modal">
+        <h3 id="modalTitle">New Project</h3>
+        <form id="projectForm" onsubmit="submitProject(event)">
+            <input type="hidden" id="projectId" value="">
+            <div class="form-group">
+                <label for="projTitle">Project Title *</label>
+                <input type="text" id="projTitle" required placeholder="e.g. Road Rehabilitation - Sampaguita St.">
+            </div>
+            <div class="form-group">
+                <label for="projDesc">Description *</label>
+                <textarea id="projDesc" required placeholder="Describe the project details..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="projStatus">Status</label>
+                    <select id="projStatus">
+                        <option value="ongoing">🔄 Ongoing</option>
+                        <option value="completed">✅ Completed</option>
+                        <option value="planned">📋 Planned</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="projBudget">Budget (₱)</label>
+                    <input type="number" id="projBudget" placeholder="0" min="0" step="0.01">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="projLocation">Location</label>
+                <input type="text" id="projLocation" placeholder="e.g. Barangay-wide, Purok 3">
+            </div>
+            <div class="form-group">
+                <label for="projImageUrl">Image URL</label>
+                <input type="url" id="projImageUrl" placeholder="https://example.com/project-image.jpg">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="projStartDate">Start Date</label>
+                    <input type="date" id="projStartDate">
+                </div>
+                <div class="form-group">
+                    <label for="projEndDate">End Date</label>
+                    <input type="date" id="projEndDate">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" onclick="closeProjectModal()">Cancel</button>
+                <button type="submit" class="btn-save" id="btnSave">Create Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 (function() {
     const grid = document.getElementById('projectGrid');
+    const currentRole = '{{ role }}';
+    const currentUserId = {{ user_id }};
     let allProjects = [];
 
     function formatCurrency(n) {
@@ -126,9 +326,19 @@
         const placeholder = p.image_url
             ? `<div class="project-img-placeholder" style="display:none;">🏗️</div>`
             : `<div class="project-img-placeholder">🏗️</div>`;
+
+        // Show edit/delete buttons only for publisher who owns the project
+        const isOwner = currentRole === 'publisher' && p.publisher_id == currentUserId;
+        const actionsHtml = isOwner ? `
+            <div class="project-actions">
+                <button class="btn-icon edit" title="Edit" onclick="event.stopPropagation();openProjectModal(${p.id})">✏️</button>
+                <button class="btn-icon delete" title="Delete" onclick="event.stopPropagation();deleteProject(${p.id}, '${escapeHtml(p.title)}')">🗑️</button>
+            </div>` : '';
+
         return `
-        <div class="project-card" data-status="${p.status}">
+        <div class="project-card" data-status="${p.status}" data-id="${p.id}">
             ${imgHtml}${placeholder}
+            ${actionsHtml}
             <div class="project-body">
                 <span class="project-status ${statusClass}">${p.status}</span>
                 <h4 class="project-title">${escapeHtml(p.title)}</h4>
@@ -156,27 +366,153 @@
         return d.innerHTML;
     }
 
-    // Load projects from API
-    fetch('/api/projects')
-        .then(r => r.json())
-        .then(data => {
-            allProjects = data.projects || [];
-            if (allProjects.length === 0) {
-                grid.innerHTML = '<div class="empty-state">No projects found.</div>';
-                return;
-            }
-            grid.innerHTML = allProjects.map(renderProject).join('');
-        })
-        .catch(() => {
-            grid.innerHTML = '<div class="empty-state">Failed to load projects.</div>';
-        });
+    function showToast(msg, type) {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        const toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+        toast.textContent = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
 
-    // Filter buttons
+    // ====== Load projects ======
+    function loadProjects() {
+        fetch('/api/projects')
+            .then(r => r.json())
+            .then(data => {
+                allProjects = data.projects || [];
+                if (allProjects.length === 0) {
+                    grid.innerHTML = '<div class="empty-state">No projects found.</div>';
+                    return;
+                }
+                grid.innerHTML = allProjects.map(renderProject).join('');
+            })
+            .catch(() => {
+                grid.innerHTML = '<div class="empty-state">Failed to load projects.</div>';
+            });
+    }
+
+    loadProjects();
+
+    // ====== Filter buttons ======
     document.getElementById('filterBar').addEventListener('click', e => {
         if (e.target.classList.contains('filter-btn')) {
             filterProjects(e.target.dataset.filter);
         }
     });
+
+    // ====== Modal helpers ======
+    window.openProjectModal = function(projectId) {
+        const overlay = document.getElementById('projectModalOverlay');
+        const modalTitle = document.getElementById('modalTitle');
+        const btnSave = document.getElementById('btnSave');
+        const form = document.getElementById('projectForm');
+
+        form.reset();
+        document.getElementById('projectId').value = '';
+
+        if (projectId) {
+            // Edit mode
+            const p = allProjects.find(pr => pr.id == projectId);
+            if (!p) return;
+            modalTitle.textContent = 'Edit Project';
+            btnSave.textContent = 'Save Changes';
+            document.getElementById('projectId').value = p.id;
+            document.getElementById('projTitle').value = p.title || '';
+            document.getElementById('projDesc').value = p.description || '';
+            document.getElementById('projStatus').value = p.status || 'ongoing';
+            document.getElementById('projBudget').value = p.budget || 0;
+            document.getElementById('projLocation').value = p.location || '';
+            document.getElementById('projImageUrl').value = p.image_url || '';
+            document.getElementById('projStartDate').value = p.start_date || '';
+            document.getElementById('projEndDate').value = p.end_date || '';
+        } else {
+            // Create mode
+            modalTitle.textContent = 'New Project';
+            btnSave.textContent = 'Create Project';
+        }
+
+        overlay.classList.add('active');
+    };
+
+    window.closeProjectModal = function() {
+        document.getElementById('projectModalOverlay').classList.remove('active');
+    };
+
+    // Close modal on overlay click
+    document.getElementById('projectModalOverlay').addEventListener('click', function(e) {
+        if (e.target === this) closeProjectModal();
+    });
+
+    // ====== Submit (create or update) ======
+    window.submitProject = function(event) {
+        event.preventDefault();
+        const projectId = document.getElementById('projectId').value;
+        const isEdit = !!projectId;
+
+        const payload = {
+            title: document.getElementById('projTitle').value.trim(),
+            description: document.getElementById('projDesc').value.trim(),
+            status: document.getElementById('projStatus').value,
+            budget: parseFloat(document.getElementById('projBudget').value) || 0,
+            location: document.getElementById('projLocation').value.trim(),
+            image_url: document.getElementById('projImageUrl').value.trim(),
+            start_date: document.getElementById('projStartDate').value,
+            end_date: document.getElementById('projEndDate').value
+        };
+
+        const url = isEdit ? `/api/projects/${projectId}` : '/api/projects';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const btnSave = document.getElementById('btnSave');
+        btnSave.disabled = true;
+        btnSave.textContent = isEdit ? 'Saving...' : 'Creating...';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                showToast(data.error, 'error');
+                btnSave.disabled = false;
+                btnSave.textContent = isEdit ? 'Save Changes' : 'Create Project';
+                return;
+            }
+            closeProjectModal();
+            showToast(isEdit ? 'Project updated!' : 'Project created!', 'success');
+            loadProjects();
+            btnSave.disabled = false;
+            btnSave.textContent = isEdit ? 'Save Changes' : 'Create Project';
+        })
+        .catch(() => {
+            showToast('Network error. Please try again.', 'error');
+            btnSave.disabled = false;
+            btnSave.textContent = isEdit ? 'Save Changes' : 'Create Project';
+        });
+    };
+
+    // ====== Delete project ======
+    window.deleteProject = function(projectId, projectTitle) {
+        if (!confirm(`Are you sure you want to delete "${projectTitle}"?\n\nThis action cannot be undone.`)) {
+            return;
+        }
+
+        fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    showToast(data.error, 'error');
+                    return;
+                }
+                showToast('Project deleted.', 'success');
+                loadProjects();
+            })
+            .catch(() => showToast('Network error. Please try again.', 'error'));
+    };
 })();
 </script>
 {% endblock %}

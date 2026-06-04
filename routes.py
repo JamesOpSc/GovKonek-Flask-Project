@@ -26,6 +26,7 @@ def _get_services():
         'posts': ext['post_service'],
         'post_repo': ext['post_repo'],
         'project_repo': ext['project_repo'],
+        'project_service': ext['project_service'],
         'service_repo': ext['service_repo'],
         'document_repo': ext['document_repo'],
         'voice': ext['voice_service'],
@@ -224,7 +225,8 @@ def create_routes(app):
         """Barangay Projects page."""
         return render_template('projects.html',
                                name=current_user.username,
-                               role=current_user.role)
+                               role=current_user.role,
+                               user_id=current_user.id)
 
     @app.route('/services')
     @login_required
@@ -253,6 +255,70 @@ def create_routes(app):
         repo = _get_services()['project_repo']
         projects = repo.get_all()
         return jsonify({'projects': projects})
+
+    @app.route('/api/projects/<int:project_id>')
+    @login_required
+    def api_get_project(project_id):
+        """API: Get a single project by ID."""
+        repo = _get_services()['project_repo']
+        project = repo.get_by_id(project_id)
+        if not project:
+            return jsonify({'error': 'Project not found'}), 404
+        return jsonify({'project': project})
+
+    @app.route('/api/projects', methods=['POST'])
+    @login_required
+    def api_create_project():
+        """API: Create a new project. ONLY publisher (barangay captain) can create."""
+        data = request.get_json()
+        title = data.get('title', '') if data else ''
+        description = data.get('description', '') if data else ''
+        status = data.get('status', 'ongoing') if data else 'ongoing'
+        budget = data.get('budget', 0) if data else 0
+        location = data.get('location', '') if data else ''
+        image_url = data.get('image_url', '') if data else ''
+        start_date = data.get('start_date', '') if data else ''
+        end_date = data.get('end_date', '') if data else ''
+        svc = _get_services()
+        project, error = svc['project_service'].create_project(
+            current_user, title, description, status,
+            budget, location, image_url, start_date, end_date
+        )
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'project': project}), 201
+
+    @app.route('/api/projects/<int:project_id>', methods=['PUT'])
+    @login_required
+    def api_update_project(project_id):
+        """API: Update a project. ONLY the publisher who created it can edit."""
+        data = request.get_json()
+        title = data.get('title', '') if data else ''
+        description = data.get('description', '') if data else ''
+        status = data.get('status', 'ongoing') if data else 'ongoing'
+        budget = data.get('budget', 0) if data else 0
+        location = data.get('location', '') if data else ''
+        image_url = data.get('image_url', '') if data else ''
+        start_date = data.get('start_date', '') if data else ''
+        end_date = data.get('end_date', '') if data else ''
+        svc = _get_services()
+        project, error = svc['project_service'].update_project(
+            current_user, project_id, title, description, status,
+            budget, location, image_url, start_date, end_date
+        )
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'project': project})
+
+    @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+    @login_required
+    def api_delete_project(project_id):
+        """API: Delete a project. ONLY the publisher who created it can delete."""
+        svc = _get_services()
+        success, error = svc['project_service'].delete_project(current_user, project_id)
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'success': True})
 
     @app.route('/api/services')
     @login_required

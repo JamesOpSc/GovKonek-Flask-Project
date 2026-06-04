@@ -271,3 +271,105 @@ class VoiceService:
     def get_categories(self):
         """Return the list of valid categories."""
         return self.CATEGORIES
+
+
+# ===========================================================================
+# ProjectService — Barangay Projects business logic
+# ===========================================================================
+
+class ProjectService:
+    """
+    Business logic for Barangay Projects.
+
+    Only publisher (barangay captain) can create, update, or delete projects.
+    All users can view projects.
+    """
+
+    VALID_STATUSES = ['ongoing', 'completed', 'planned']
+
+    def __init__(self, project_repo=None):
+        """
+        @param project_repo: ProjectRepository instance.
+        """
+        from repository import ProjectRepository
+        self._repo = project_repo or ProjectRepository()
+
+    # -- read ------------------------------------------------------------
+
+    def get_all(self):
+        """Get all projects, newest first."""
+        return self._repo.get_all()
+
+    def get_by_id(self, project_id):
+        """Get a single project by ID."""
+        return self._repo.get_by_id(project_id)
+
+    # -- publisher-only mutations ----------------------------------------
+
+    def create_project(self, user, title, description, status='ongoing',
+                       budget=0, location='', image_url='',
+                       start_date='', end_date=''):
+        """
+        Create a new project. ONLY publisher (barangay captain) can create.
+        Returns (project_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can create projects."
+        if not title or not title.strip():
+            return None, "Title is required."
+        if not description or not description.strip():
+            return None, "Description is required."
+        if status not in self.VALID_STATUSES:
+            status = 'ongoing'
+
+        project = self._repo.create(
+            title=title.strip(),
+            description=description.strip(),
+            status=status,
+            budget=budget,
+            location=location.strip(),
+            image_url=image_url.strip(),
+            start_date=start_date,
+            end_date=end_date,
+            publisher_id=user.id
+        )
+        return (project, None) if project else (None, "Failed to create project.")
+
+    def update_project(self, user, project_id, title, description, status,
+                       budget, location, image_url, start_date, end_date):
+        """
+        Update a project. ONLY the publisher who created it can edit.
+        Returns (project_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can edit projects."
+        if not title or not title.strip():
+            return None, "Title is required."
+        if not description or not description.strip():
+            return None, "Description is required."
+        if status not in self.VALID_STATUSES:
+            status = 'ongoing'
+
+        project = self._repo.update(
+            project_id=project_id,
+            publisher_id=user.id,
+            title=title.strip(),
+            description=description.strip(),
+            status=status,
+            budget=budget,
+            location=location.strip(),
+            image_url=image_url.strip(),
+            start_date=start_date,
+            end_date=end_date
+        )
+        return (project, None) if project else (None, "Project not found or you are not authorized to edit it.")
+
+    def delete_project(self, user, project_id):
+        """
+        Delete a project. ONLY the publisher who created it can delete.
+        Returns (success: bool, error).
+        """
+        if not user.can_publish():
+            return False, "Only the Barangay Captain can delete projects."
+        self._repo.delete(project_id, user.id)
+        return True, None

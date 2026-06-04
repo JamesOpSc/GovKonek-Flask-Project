@@ -373,6 +373,60 @@ class ProjectRepository:
         conn.close()
         return dict(project) if project else None
 
+    def create(self, title, description, status='ongoing', budget=0,
+               location='', image_url='', start_date='', end_date='', publisher_id=None):
+        """Create a new project. Returns the created project as a dict."""
+        conn = self._get_db()
+        try:
+            cursor = conn.execute(
+                '''INSERT INTO projects
+                   (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
+            )
+            conn.commit()
+            project_id = cursor.lastrowid
+            project = conn.execute(
+                'SELECT * FROM projects WHERE id = ?', (project_id,)
+            ).fetchone()
+            return dict(project) if project else None
+        finally:
+            conn.close()
+
+    def update(self, project_id, publisher_id, title, description, status,
+               budget, location, image_url, start_date, end_date):
+        """Update a project. Only the owning publisher can update. Returns updated project or None."""
+        conn = self._get_db()
+        try:
+            conn.execute(
+                '''UPDATE projects
+                   SET title = ?, description = ?, status = ?, budget = ?,
+                       location = ?, image_url = ?, start_date = ?, end_date = ?
+                   WHERE id = ? AND publisher_id = ?''',
+                (title, description, status, budget, location, image_url,
+                 start_date, end_date, project_id, publisher_id)
+            )
+            conn.commit()
+            project = conn.execute(
+                'SELECT * FROM projects WHERE id = ?', (project_id,)
+            ).fetchone()
+            return dict(project) if project else None
+        finally:
+            conn.close()
+
+    def delete(self, project_id, publisher_id):
+        """Delete a project. Only the owning publisher can delete."""
+        conn = self._get_db()
+        try:
+            conn.execute(
+                'DELETE FROM projects WHERE id = ? AND publisher_id = ?',
+                (project_id, publisher_id)
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
 
 # ===========================================================================
 # ServiceRepository
