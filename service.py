@@ -88,9 +88,9 @@ class PostService:
 
     # -- feed / detail ----------------------------------------------------
 
-    def get_feed(self):
-        """Get all published posts for the feed."""
-        posts = self._post_repo.get_all_posts()
+    def get_feed(self, search=None, category=None, sort=None):
+        """Get published posts with optional search, category filter, and sorting."""
+        posts = self._post_repo.get_all_posts(search=search, category=category, sort=sort)
         return [dict(p) for p in posts]
 
     def get_post_detail(self, post_id, user_id=None):
@@ -134,7 +134,7 @@ class PostService:
 
     # -- publisher-only post management -----------------------------------
 
-    def create_post(self, user, title, content):
+    def create_post(self, user, title, content, category='Announcement'):
         """
         Create a new post. ONLY publisher (barangay captain) can publish.
         Returns (post_dict, error).
@@ -146,7 +146,12 @@ class PostService:
         if not content or not content.strip():
             return None, "Content is required."
 
-        post = self._post_repo.create_post(user.id, title.strip(), content.strip())
+        # Validate category
+        valid_categories = ['Announcement', 'Emergency', 'Health', 'Project']
+        if category not in valid_categories:
+            category = 'Announcement'
+
+        post = self._post_repo.create_post(user.id, title.strip(), content.strip(), category)
         return (post, None) if post else (None, "Failed to create post.")
 
     def update_post(self, user, post_id, title, content):

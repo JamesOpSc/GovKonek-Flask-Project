@@ -126,13 +126,13 @@ class PostRepository:
 
     # -- post CRUD --------------------------------------------------------
 
-    def create_post(self, publisher_id, title, content, status='published'):
+    def create_post(self, publisher_id, title, content, category='Announcement', status='published'):
         """Create a new post. Returns the created post as a dict."""
         conn = self._get_db()
         try:
             cursor = conn.execute(
-                'INSERT INTO posts (publisher_id, title, content, status) VALUES (?, ?, ?, ?)',
-                (publisher_id, title, content, status)
+                'INSERT INTO posts (publisher_id, title, content, category, status) VALUES (?, ?, ?, ?, ?)',
+                (publisher_id, title, content, category, status)
             )
             conn.commit()
             post_id = cursor.lastrowid
@@ -176,16 +176,45 @@ class PostRepository:
         finally:
             conn.close()
 
-    def get_all_posts(self):
-        """Fetch all published posts, newest first."""
+    def get_all_posts(self, search=None, category=None, sort='newest'):
+        """
+        Fetch published posts with optional search, category filter, and sorting.
+
+        @param search: Text to search in title and content (case-insensitive).
+        @param category: Filter by post category (e.g. 'Announcement', 'Emergency', 'Health', 'Project').
+                         Pass None or empty string for all categories.
+        @param sort: Sort order — 'newest' (default), 'oldest', 'title'.
+        @return: List of sqlite3.Row objects.
+        """
         conn = self._get_db()
-        posts = conn.execute('''
+
+        query = '''
             SELECT p.*, u.username as publisher_name
             FROM posts p
             JOIN users u ON p.publisher_id = u.id
             WHERE p.status = 'published'
-            ORDER BY p.created_at DESC
-        ''').fetchall()
+        '''
+        params = []
+
+        if search and search.strip():
+            query += ' AND (p.title LIKE ? OR p.content LIKE ?)'
+            like_val = f'%{search.strip()}%'
+            params.extend([like_val, like_val])
+
+        if category and category.strip():
+            query += ' AND p.category = ?'
+            params.append(category.strip())
+
+        # Sorting
+        sort_map = {
+            'newest': 'p.created_at DESC',
+            'oldest': 'p.created_at ASC',
+            'title': 'p.title ASC',
+        }
+        order_clause = sort_map.get(sort, 'p.created_at DESC')
+        query += f' ORDER BY {order_clause}'
+
+        posts = conn.execute(query, params).fetchall()
         conn.close()
         return posts
 

@@ -139,6 +139,13 @@
         <div class="modal-body">
             <label for="postTitle">Title</label>
             <input type="text" id="postTitle" placeholder="Enter announcement title..." maxlength="200">
+            <label for="postCategory">Category</label>
+            <select id="postCategory" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;outline:none;">
+                <option value="Announcement">📢 Announcement</option>
+                <option value="Emergency">🚨 Emergency</option>
+                <option value="Health">⚕️ Health</option>
+                <option value="Project">🏗️ Project</option>
+            </select>
             <label for="postContent">Content</label>
             <textarea id="postContent" placeholder="Write your announcement here..."></textarea>
         </div>
@@ -189,6 +196,7 @@
                 <thead>
                     <tr>
                         <th>Status</th>
+                        <th>Category</th>
                         <th>Title</th>
                         <th>Date Posted</th>
                         <th>Actions</th>
@@ -198,10 +206,11 @@
                     ${data.posts.map(p => `
                         <tr>
                             <td><span class="status-badge status-published">${p.status || 'Published'}</span></td>
+                            <td><span style="font-size:12px;font-weight:600;color:#64748b;">${escapeHtml(p.category || 'Announcement')}</span></td>
                             <td style="font-weight:600;">${escapeHtml(p.title)}</td>
                             <td style="color:#64748b;">${formatDateShort(p.created_at)}</td>
                             <td>
-                                <button class="btn-action" onclick="openEditModal(${p.id}, '${escapeJs(p.title)}', '${escapeJs(p.content)}')">✏️ Edit</button>
+                                <button class="btn-action" onclick="openEditModal(${p.id}, '${escapeJs(p.title)}', '${escapeJs(p.content)}', '${escapeJs(p.category || '')}')">✏️ Edit</button>
                                 <button class="btn-action delete" onclick="confirmDelete(${p.id}, '${escapeJs(p.title)}')">🗑️ Delete</button>
                             </td>
                         </tr>
@@ -218,16 +227,18 @@
         editingPostId = null;
         document.getElementById('modalTitle').textContent = 'Publish New Announcement';
         document.getElementById('postTitle').value = '';
+        document.getElementById('postCategory').value = 'Announcement';
         document.getElementById('postContent').value = '';
         document.getElementById('btnSave').textContent = 'Publish';
         document.getElementById('postModal').classList.add('active');
     };
 
     // Modal open for edit
-    window.openEditModal = function(postId, title, content) {
+    window.openEditModal = function(postId, title, content, category) {
         editingPostId = postId;
         document.getElementById('modalTitle').textContent = 'Edit Announcement';
         document.getElementById('postTitle').value = title;
+        document.getElementById('postCategory').value = category || 'Announcement';
         document.getElementById('postContent').value = content;
         document.getElementById('btnSave').textContent = 'Save Changes';
         document.getElementById('postModal').classList.add('active');
@@ -243,6 +254,7 @@
     window.savePost = async function() {
         const title = document.getElementById('postTitle').value.trim();
         const content = document.getElementById('postContent').value.trim();
+        const category = document.getElementById('postCategory').value;
         if (!title || !content) {
             showToast('Please fill in both title and content.', 'error');
             return;
@@ -264,7 +276,7 @@
                 res = await fetch('/api/posts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content })
+                    body: JSON.stringify({ title, content, category })
                 });
             }
             const data = await res.json();

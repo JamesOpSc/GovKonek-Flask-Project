@@ -136,14 +136,111 @@
 
 <div class="sticky-wrapper">
     <div class="search-container">
-        <input type="text" class="search-input" placeholder="Search announcements, resolutions, or events...">
-        <button class="search-btn">🔍</button>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search announcements, resolutions, or events...">
+        <button class="search-btn" id="searchBtn">🔍</button>
     </div>
     
-    <div class="filter-group">
-        <button class="pill pill-all active">All Posts</button>
-        <button class="pill pill-announcement">📢 Announcements</button> <button class="pill pill-urgent">🚨 Emergencies</button>
-        <button class="pill pill-health">⚕️ Health</button>
-        <button class="pill pill-project">🏗️ Projects</button>
+    <div class="filter-group" id="filterGroup">
+        <button class="pill pill-all active" data-category="">All Posts</button>
+        <button class="pill pill-announcement" data-category="Announcement">📢 Announcements</button>
+        <button class="pill pill-urgent" data-category="Emergency">🚨 Emergencies</button>
+        <button class="pill pill-health" data-category="Health">⚕️ Health</button>
+        <button class="pill pill-project" data-category="Project">🏗️ Projects</button>
     </div>
 </div>
+
+<script>
+(function() {
+    // Shared filter state — read by feed.js
+    window.GovKonekFilters = {
+        search: '',
+        category: ''
+    };
+
+    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const filterGroup = document.getElementById('filterGroup');
+
+    // Debounce helper
+    let debounceTimer;
+    function debounce(fn, delay) {
+        return function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(fn, delay);
+        };
+    }
+
+    // Apply filters and trigger feed reload
+    function applyFilters() {
+        window.GovKonekFilters.search = searchInput.value.trim();
+        // Dispatch custom event so feed.js can respond
+        document.dispatchEvent(new CustomEvent('govkonek:filter', {
+            detail: { search: window.GovKonekFilters.search, category: window.GovKonekFilters.category }
+        }));
+    }
+
+    // Search: type-to-search (debounced) + button click
+    searchInput.addEventListener('input', debounce(applyFilters, 350));
+    searchBtn.addEventListener('click', applyFilters);
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            clearTimeout(debounceTimer);
+            applyFilters();
+        }
+    });
+
+    // Filter pills: toggle active and update category
+    filterGroup.addEventListener('click', function(e) {
+        const pill = e.target.closest('.pill');
+        if (!pill) return;
+
+        // Update active state
+        filterGroup.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+
+        // Update category
+        window.GovKonekFilters.category = pill.getAttribute('data-category') || '';
+
+        // Trigger reload
+        document.dispatchEvent(new CustomEvent('govkonek:filter', {
+            detail: { search: window.GovKonekFilters.search, category: window.GovKonekFilters.category }
+        }));
+    });
+
+    // Add active styles for all pill types
+    const activeStyles = document.createElement('style');
+    activeStyles.textContent = `
+        .pill-all.active {
+            background: var(--primary) !important;
+            color: #ffffff !important;
+            border-color: var(--primary) !important;
+            box-shadow: 0 6px 12px rgba(0, 86, 179, 0.25) !important;
+        }
+        .pill-announcement.active {
+            background: #ede9fe !important;
+            border-color: #c4b5fd !important;
+            color: #7c3aed !important;
+            box-shadow: 0 6px 12px rgba(124, 58, 237, 0.2) !important;
+        }
+        .pill-urgent.active {
+            background: #fef2f2 !important;
+            border-color: #fca5a5 !important;
+            color: #dc2626 !important;
+            box-shadow: 0 6px 12px rgba(220, 38, 38, 0.2) !important;
+        }
+        .pill-health.active {
+            background: #f0f9ff !important;
+            border-color: #7dd3fc !important;
+            color: #0284c7 !important;
+            box-shadow: 0 6px 12px rgba(2, 132, 199, 0.2) !important;
+        }
+        .pill-project.active {
+            background: #fdf8f2 !important;
+            border-color: #fcd34d !important;
+            color: #b45309 !important;
+            box-shadow: 0 6px 12px rgba(180, 83, 9, 0.2) !important;
+        }
+    `;
+    document.head.appendChild(activeStyles);
+})();
+</script>

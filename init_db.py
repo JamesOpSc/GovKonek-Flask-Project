@@ -23,10 +23,17 @@ def create_database():
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             status TEXT DEFAULT 'published',
+            category TEXT DEFAULT 'Announcement',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (publisher_id) REFERENCES users(id)
         )
     ''')
+
+    # -- Migration: add category column if it doesn't exist -------------
+    try:
+        cursor.execute("ALTER TABLE posts ADD COLUMN category TEXT DEFAULT 'Announcement'")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     # -- Comments --------------------------------------------------------
     cursor.execute('''
@@ -155,17 +162,20 @@ def create_database():
     cursor.execute('SELECT COUNT(*) FROM posts')
     if cursor.fetchone()[0] == 0:
         cursor.executemany(
-            'INSERT INTO posts (publisher_id, title, content) VALUES (?, ?, ?)',
+            'INSERT INTO posts (publisher_id, title, content, category) VALUES (?, ?, ?, ?)',
             [
                 (publisher_id, 'Barangay Hall Solar Panel Installation',
                  'The transition to renewable energy for the main barangay hall is now 100% complete. '
-                 'This initiative will reduce our electricity costs by approximately 40% annually.'),
+                 'This initiative will reduce our electricity costs by approximately 40% annually.',
+                 'Project'),
                 (publisher_id, 'Free Dental Mission Weekend',
                  'Free tooth extractions and checkups this Saturday at the Covered Court, 8AM to 12PM. '
-                 'First-come, first-served basis.'),
+                 'First-come, first-served basis.',
+                 'Health'),
                 (publisher_id, 'New Barangay Ordinance: Waste Segregation',
                  'Starting next month, all households are required to segregate waste. '
-                 'Fines imposed after a 30-day grace period.'),
+                 'Fines imposed after a 30-day grace period.',
+                 'Announcement'),
             ]
         )
 

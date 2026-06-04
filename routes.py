@@ -110,9 +110,12 @@ def create_routes(app):
     @app.route('/api/posts')
     @login_required
     def api_get_posts():
-        """API: Get all published posts for the feed."""
+        """API: Get published posts with optional search, category filter, and sort."""
+        search = request.args.get('search', '')
+        category = request.args.get('category', '')
+        sort = request.args.get('sort', 'newest')
         svc = _get_services()
-        posts = svc['posts'].get_feed()
+        posts = svc['posts'].get_feed(search=search, category=category, sort=sort)
         return jsonify({'posts': posts})
 
     @app.route('/api/posts/<int:post_id>')
@@ -168,8 +171,9 @@ def create_routes(app):
         data = request.get_json()
         title = data.get('title', '') if data else ''
         content = data.get('content', '') if data else ''
+        category = data.get('category', 'Announcement') if data else 'Announcement'
         svc = _get_services()
-        post, error = svc['posts'].create_post(current_user, title, content)
+        post, error = svc['posts'].create_post(current_user, title, content, category)
         if error:
             return jsonify({'error': error}), 403
         return jsonify({'post': post}), 201

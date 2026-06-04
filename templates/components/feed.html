@@ -28,9 +28,11 @@
     }
     .post-meta {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-start;
         align-items: center;
+        gap: 8px;
         margin-bottom: 10px;
+        flex-wrap: wrap;
     }
     .status-badge {
         font-size: 11px;
@@ -41,6 +43,20 @@
         border-radius: 20px;
     }
     .status-published { background: #dcfce7; color: #166534; }
+    .post-category-badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        margin-left: 8px;
+    }
+    .cat-Announcement { background: #ede9fe; color: #7c3aed; }
+    .cat-Emergency { background: #fef2f2; color: #dc2626; }
+    .cat-Health { background: #f0f9ff; color: #0284c7; }
+    .cat-Project { background: #fdf8f2; color: #b45309; }
     .post-date {
         font-size: 12px;
         color: #94a3b8;
@@ -259,13 +275,20 @@
     const userId = window.GOVKONEK_USER_ID;
     const ALLOWED_EMOJI = ['👍', '❤️', '😄', '😢', '😡', '🎉'];
 
-    // Fetch and render all posts
+    // Fetch and render all posts (with optional filters)
     async function loadFeed() {
         try {
-            const res = await fetch('/api/posts');
+            const filters = window.GovKonekFilters || { search: '', category: '' };
+            const params = new URLSearchParams();
+            if (filters.search) params.set('search', filters.search);
+            if (filters.category) params.set('category', filters.category);
+
+            const queryString = params.toString();
+            const url = '/api/posts' + (queryString ? '?' + queryString : '');
+            const res = await fetch(url);
             const data = await res.json();
             if (data.posts.length === 0) {
-                container.innerHTML = '<div class="no-comments">No announcements yet.</div>';
+                container.innerHTML = '<div class="no-comments">No announcements match your search. Try a different filter.</div>';
                 return;
             }
             container.innerHTML = data.posts.map(post => renderPostCard(post)).join('');
@@ -277,11 +300,14 @@
     function renderPostCard(post) {
         const dateStr = post.created_at ? formatDate(post.created_at) : '';
         const snippet = post.content ? post.content.substring(0, 120) + (post.content.length > 120 ? '...' : '') : '';
+        const category = post.category || 'Announcement';
+        const catClass = 'cat-' + category;
         return `
         <div class="post-card" data-post-id="${post.id}">
             <div class="post-header" onclick="expandPost(event, ${post.id})">
                 <div class="post-meta">
                     <span class="status-badge status-published">${post.status || 'Published'}</span>
+                    <span class="post-category-badge ${catClass}">${escapeHtml(category)}</span>
                     <span class="post-date">${dateStr}</span>
                 </div>
                 <h4 class="post-title">${escapeHtml(post.title)}</h4>
@@ -497,5 +523,10 @@
 
     // Initial load
     loadFeed();
+
+    // Listen for filter changes from utility_bar
+    document.addEventListener('govkonek:filter', function() {
+        loadFeed();
+    });
 })();
 </script>
