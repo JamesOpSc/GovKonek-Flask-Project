@@ -37,7 +37,8 @@ class Config:
                  db_name=None,
                  secret_key=None,
                  login_view=None,
-                 openweather_api_key=None):
+                 openweather_api_key=None,
+                 upload_folder=None):
         """
         @param db_name: SQLite database filename (default: from GOVKONEK_DB env or 'govkonek.db')
         @param secret_key: Flask session signing key (default: from GOVKONEK_SECRET_KEY env)
