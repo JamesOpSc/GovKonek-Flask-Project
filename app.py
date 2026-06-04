@@ -24,8 +24,8 @@ REFACTORED for testability:
 from flask import Flask
 from flask_login import LoginManager
 from config import Config, SECRET_KEY, LOGIN_VIEW
-from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository
-from service import AuthService, PostService
+from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository
+from service import AuthService, PostService, VoiceService
 from models import create_user_from_db
 from routes import create_routes
 
@@ -54,10 +54,12 @@ def _build_services(app, config):
     project_repo = ProjectRepository(db_path=config.db_name)
     service_repo = ServiceRepository(db_path=config.db_name)
     document_repo = DocumentRepository(db_path=config.db_name)
+    voice_repo = VoiceRepository(db_path=config.db_name)
 
     # -- services (injectable repositories) -------------------------------
     auth_service = AuthService(user_repo=user_repo)
     post_service = PostService(post_repo=post_repo)
+    voice_service = VoiceService(voice_repo=voice_repo)
 
     # -- attach to app ----------------------------------------------------
     app.extensions['config'] = config
@@ -66,8 +68,10 @@ def _build_services(app, config):
     app.extensions['project_repo'] = project_repo
     app.extensions['service_repo'] = service_repo
     app.extensions['document_repo'] = document_repo
+    app.extensions['voice_repo'] = voice_repo
     app.extensions['auth_service'] = auth_service
     app.extensions['post_service'] = post_service
+    app.extensions['voice_service'] = voice_service
 
 
 # ===========================================================================

@@ -1,0 +1,704 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* ================================================================ */
+    /* CITIZENS' VOICE — Community Forum Styles                         */
+    /* ================================================================ */
+
+    .voice-header {
+        background: linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%);
+        color: white;
+        padding: 24px 32px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+    }
+    .voice-header h2 { font-size: 24px; font-weight: 700; }
+    .voice-header p { opacity: 0.9; font-size: 14px; margin-top: 4px; }
+
+    .btn-primary {
+        background: white;
+        color: #7c3aed;
+        padding: 10px 22px;
+        border-radius: 8px;
+        font-weight: 700;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .btn-outline {
+        background: transparent;
+        color: #7c3aed;
+        border: 1px solid #d4c4fc;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+    .btn-outline:hover { background: #f5f3ff; border-color: #7c3aed; }
+
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        transition: all 0.15s;
+    }
+
+    /* -- Category Pills ----------------------------------------------- */
+    .voice-filters {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+    .voice-pill {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #475569;
+        transition: all 0.2s;
+        user-select: none;
+    }
+    .voice-pill:hover { border-color: #7c3aed; color: #7c3aed; }
+    .voice-pill.active { background: #7c3aed; color: white; border-color: #7c3aed; }
+
+    /* -- Two-column Layout -------------------------------------------- */
+    .voice-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        align-items: start;
+    }
+    @media (max-width: 900px) {
+        .voice-layout { grid-template-columns: 1fr; }
+    }
+
+    /* -- Post List Cards ---------------------------------------------- */
+    .voice-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .voice-card {
+        background: white;
+        border-radius: 10px;
+        padding: 16px 20px;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .voice-card:hover { border-color: #c4b5fd; box-shadow: 0 2px 8px rgba(124,58,237,0.08); }
+    .voice-card.selected { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.1); }
+
+    .voice-card-title {
+        font-weight: 700;
+        font-size: 15px;
+        color: #1e293b;
+        margin-bottom: 6px;
+        line-height: 1.3;
+    }
+    .voice-card-meta {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 8px;
+    }
+    .voice-card-meta span { display: inline-flex; align-items: center; gap: 4px; }
+
+    .badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+    .badge-grievance { background: #fef2f2; color: #dc2626; }
+    .badge-suggestion { background: #ecfdf5; color: #059669; }
+    .badge-question { background: #eff6ff; color: #2563eb; }
+    .badge-general { background: #f5f3ff; color: #7c3aed; }
+    .badge-announcement { background: #fff7ed; color: #ea580c; }
+    .badge-open { background: #f0fdf4; color: #16a34a; }
+    .badge-resolved { background: #eff6ff; color: #2563eb; }
+    .badge-closed { background: #f1f5f9; color: #64748b; }
+
+    /* -- Detail Panel ------------------------------------------------- */
+    .voice-detail {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+    }
+    .voice-detail-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 60px 30px;
+        color: #94a3b8;
+        text-align: center;
+    }
+    .voice-detail-empty .icon { font-size: 52px; margin-bottom: 16px; }
+
+    .detail-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .detail-title { font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 8px; }
+    .detail-body {
+        padding: 20px 24px;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #334155;
+        white-space: pre-wrap;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .detail-actions {
+        padding: 12px 24px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid #f1f5f9;
+        flex-wrap: wrap;
+    }
+    .vote-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.15s;
+    }
+    .vote-btn:hover { background: #f8fafc; }
+    .vote-btn.voted-up { background: #f0fdf4; border-color: #86efac; color: #16a34a; }
+    .vote-btn.voted-down { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
+
+    .vote-count { font-weight: 700; font-size: 14px; }
+
+    /* -- Comments Section --------------------------------------------- */
+    .comments-section { padding: 0 24px 20px 24px; }
+    .comments-title { font-weight: 700; font-size: 15px; padding: 16px 0 12px 0; color: #334155; }
+
+    .comment-item {
+        padding: 14px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .comment-item:last-child { border-bottom: none; }
+    .comment-author {
+        font-weight: 700;
+        font-size: 13px;
+        color: #1e293b;
+        margin-bottom: 4px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .comment-body { font-size: 14px; color: #475569; line-height: 1.5; white-space: pre-wrap; }
+    .comment-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+    .official-badge {
+        background: #7c3aed;
+        color: white;
+        font-size: 10px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+    }
+
+    .comment-form {
+        display: flex;
+        gap: 10px;
+        padding: 16px 0 8px 0;
+    }
+    .comment-input {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .comment-input:focus { border-color: #7c3aed; }
+
+    /* -- Modal -------------------------------------------------------- */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+        background: white;
+        border-radius: 16px;
+        padding: 32px;
+        width: 90%;
+        max-width: 560px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #1e293b; }
+    .modal label { display: block; font-weight: 600; font-size: 13px; color: #475569; margin-bottom: 6px; margin-top: 14px; }
+    .modal input, .modal textarea, .modal select {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        font-family: inherit;
+        transition: border-color 0.2s;
+    }
+    .modal input:focus, .modal textarea:focus, .modal select:focus { border-color: #7c3aed; }
+    .modal textarea { resize: vertical; min-height: 120px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+    .btn-cancel { background: #f1f5f9; color: #475569; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .btn-submit { background: #7c3aed; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; }
+    .btn-submit:hover { background: #6d28d9; }
+
+    .voice-empty { text-align: center; padding: 40px; color: #94a3b8; }
+    .voice-spinner { text-align: center; padding: 30px; color: #7c3aed; }
+</style>
+
+<script>
+    window.GOVKONEK_USER_ID = {{ user_id }};
+    window.GOVKONEK_USERNAME = "{{ name }}";
+    window.GOVKONEK_ROLE = "{{ role }}";
+</script>
+
+<!-- ================================================================= -->
+<!-- HEADER                                                            -->
+<!-- ================================================================= -->
+<div class="voice-header">
+    <div>
+        <h2>🗣️ Citizens' Voice</h2>
+        <p>Speak up. Be heard. Shape your community.</p>
+    </div>
+    <button class="btn-primary" onclick="openNewPostModal()">✏️ New Post</button>
+</div>
+
+<!-- ================================================================= -->
+<!-- FILTERS                                                           -->
+<!-- ================================================================= -->
+<div class="voice-filters">
+    <span style="font-weight:700;font-size:13px;color:#64748b;margin-right:4px;">Category:</span>
+    <span class="voice-pill active" data-category="" onclick="filterCategory('')">All</span>
+    <span class="voice-pill" data-category="Grievance" onclick="filterCategory('Grievance')">😠 Grievance</span>
+    <span class="voice-pill" data-category="Suggestion" onclick="filterCategory('Suggestion')">💡 Suggestion</span>
+    <span class="voice-pill" data-category="Question" onclick="filterCategory('Question')">❓ Question</span>
+    <span class="voice-pill" data-category="Announcement" onclick="filterCategory('Announcement')">📢 Announcement</span>
+    <span class="voice-pill" data-category="General" onclick="filterCategory('General')">💬 General</span>
+</div>
+
+<!-- ================================================================= -->
+<!-- MAIN LAYOUT: Post List + Detail Panel                             -->
+<!-- ================================================================= -->
+<div class="voice-layout">
+    <!-- LEFT: Post List -->
+    <div>
+        <div class="voice-list" id="voiceList">
+            <div class="voice-spinner">Loading posts...</div>
+        </div>
+        <div class="voice-empty" id="voiceEmpty" style="display:none;">
+            No posts found. Be the first to speak up!
+        </div>
+    </div>
+
+    <!-- RIGHT: Detail Panel -->
+    <div class="voice-detail" id="voiceDetail">
+        <div class="voice-detail-empty">
+            <div class="icon">💬</div>
+            <p style="font-weight:600;font-size:15px;">Select a post to view</p>
+            <p style="font-size:13px;margin-top:4px;">Click on any topic from the list</p>
+        </div>
+    </div>
+</div>
+
+<!-- ================================================================= -->
+<!-- NEW POST MODAL                                                    -->
+<!-- ================================================================= -->
+<div class="modal-overlay" id="newPostModal">
+    <div class="modal">
+        <h3>✏️ Create New Voice Post</h3>
+        <label for="postCategory">Category</label>
+        <select id="postCategory">
+            <option value="General">💬 General</option>
+            <option value="Grievance">😠 Grievance</option>
+            <option value="Suggestion">💡 Suggestion</option>
+            <option value="Question">❓ Question</option>
+            <option value="Announcement">📢 Announcement</option>
+        </select>
+        <label for="postTitle">Title</label>
+        <input type="text" id="postTitle" placeholder="What's on your mind?" maxlength="200" />
+        <label for="postContent">Details</label>
+        <textarea id="postContent" placeholder="Share your thoughts, concerns, or suggestions..."></textarea>
+        <div class="modal-actions">
+            <button class="btn-cancel" onclick="closeNewPostModal()">Cancel</button>
+            <button class="btn-submit" onclick="submitVoicePost()">Post to Citizens' Voice</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // =====================================================================
+    // STATE
+    // =====================================================================
+    let currentCategory = '';
+    let selectedPostId = null;
+    let allPosts = [];
+
+    // =====================================================================
+    // INIT
+    // =====================================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        loadPosts();
+    });
+
+    // =====================================================================
+    // LOAD POSTS
+    // =====================================================================
+    async function loadPosts() {
+        const list = document.getElementById('voiceList');
+        const empty = document.getElementById('voiceEmpty');
+        list.innerHTML = '<div class="voice-spinner">Loading posts...</div>';
+        empty.style.display = 'none';
+
+        try {
+            let url = '/api/voice';
+            if (currentCategory) url += `?category=${encodeURIComponent(currentCategory)}`;
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Failed to load posts');
+            const data = await resp.json();
+            allPosts = data.posts;
+
+            if (allPosts.length === 0) {
+                list.innerHTML = '';
+                empty.style.display = 'block';
+            } else {
+                renderPostList(allPosts);
+            }
+        } catch (err) {
+            list.innerHTML = '<div class="voice-empty">⚠️ Failed to load posts. Please try again.</div>';
+        }
+    }
+
+    function renderPostList(posts) {
+        const list = document.getElementById('voiceList');
+        list.innerHTML = posts.map(p => {
+            const categoryClass = `badge-${p.category.toLowerCase()}`;
+            const statusClass = `badge-${p.status}`;
+            const isSelected = p.id === selectedPostId ? ' selected' : '';
+            const timeAgo = formatTimeAgo(p.created_at);
+            return `
+                <div class="voice-card${isSelected}" onclick="selectPost(${p.id})" id="card-${p.id}">
+                    <div class="voice-card-title">${escapeHtml(p.title)}</div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+                        <span class="badge ${categoryClass}">${p.category}</span>
+                        <span class="badge ${statusClass}">${p.status}</span>
+                    </div>
+                    <div class="voice-card-meta">
+                        <span>👤 ${escapeHtml(p.author_name)}${p.author_role === 'publisher' ? ' ⭐' : ''}</span>
+                        <span>👍 ${p.vote_count}</span>
+                        <span>💬 ${p.comment_count}</span>
+                        <span>🕐 ${timeAgo}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // =====================================================================
+    // SELECT POST & SHOW DETAIL
+    // =====================================================================
+    async function selectPost(postId) {
+        selectedPostId = postId;
+        // Update card highlights
+        document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
+        const card = document.getElementById('card-' + postId);
+        if (card) card.classList.add('selected');
+
+        const detail = document.getElementById('voiceDetail');
+        detail.innerHTML = '<div class="voice-spinner" style="padding:40px;">Loading...</div>';
+
+        try {
+            const resp = await fetch(`/api/voice/${postId}`);
+            if (!resp.ok) throw new Error('Post not found');
+            const data = await resp.json();
+            renderDetail(data);
+        } catch (err) {
+            detail.innerHTML = '<div class="voice-detail-empty"><p>⚠️ Failed to load post details.</p></div>';
+        }
+    }
+
+    function renderDetail(data) {
+        const p = data.post;
+        const comments = data.comments || [];
+        const userVote = data.user_vote;
+        const categoryClass = `badge-${p.category.toLowerCase()}`;
+        const statusClass = `badge-${p.status}`;
+        const timeAgo = formatTimeAgo(p.created_at);
+
+        let commentsHtml = comments.map(c => {
+            const isOfficial = c.is_official || c.author_role === 'publisher';
+            return `
+                <div class="comment-item">
+                    <div class="comment-author">
+                        ${escapeHtml(c.author_name)}
+                        ${isOfficial ? '<span class="official-badge">OFFICIAL</span>' : ''}
+                    </div>
+                    <div class="comment-body">${escapeHtml(c.content)}</div>
+                    <div class="comment-time">${formatTimeAgo(c.created_at)}</div>
+                </div>
+            `;
+        }).join('');
+
+        const detail = document.getElementById('voiceDetail');
+        detail.innerHTML = `
+            <div class="detail-header">
+                <div class="detail-title">${escapeHtml(p.title)}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <span class="badge ${categoryClass}">${p.category}</span>
+                    <span class="badge ${statusClass}">${p.status}</span>
+                    <span style="font-size:12px;color:#94a3b8;">👤 ${escapeHtml(p.author_name)}${p.author_role==='publisher'?' ⭐':''} · ${timeAgo}</span>
+                    ${GOVKONEK_ROLE === 'publisher' ? `
+                        <select onchange="changeStatus(${p.id}, this.value)" style="margin-left:auto;padding:4px 8px;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;">
+                            <option value="open" ${p.status==='open'?'selected':''}>Open</option>
+                            <option value="resolved" ${p.status==='resolved'?'selected':''}>Resolved</option>
+                            <option value="closed" ${p.status==='closed'?'selected':''}>Closed</option>
+                        </select>
+                    ` : ''}
+                </div>
+            </div>
+
+            <div class="detail-body">${escapeHtml(p.content)}</div>
+
+            <div class="detail-actions">
+                <button class="vote-btn ${userVote==='up'?'voted-up':''}" onclick="vote(${p.id},'up')">
+                    👍 <span class="vote-count" id="voteCount">${p.vote_count}</span>
+                </button>
+                <button class="vote-btn ${userVote==='down'?'voted-down':''}" onclick="vote(${p.id},'down')">
+                    👎
+                </button>
+                ${(p.user_id == GOVKONEK_USER_ID || GOVKONEK_ROLE === 'publisher') ? `
+                    <button class="btn-outline" style="margin-left:auto;color:#ef4444;border-color:#fecaca;" onclick="deleteVoicePost(${p.id})">🗑️ Delete</button>
+                ` : ''}
+            </div>
+
+            <div class="comments-section">
+                <div class="comments-title">💬 Comments (${comments.length})</div>
+                ${commentsHtml || '<p style="color:#94a3b8;font-size:13px;padding:8px 0;">No comments yet. Be the first to respond!</p>'}
+                <div class="comment-form">
+                    <input type="text" id="commentInput" class="comment-input" placeholder="Write a comment..." onkeydown="if(event.key==='Enter')addComment(${p.id})" />
+                    <button class="btn-outline" onclick="addComment(${p.id})">Send</button>
+                </div>
+            </div>
+        `;
+    }
+
+    // =====================================================================
+    // VOTE
+    // =====================================================================
+    async function vote(postId, voteType) {
+        try {
+            const resp = await fetch(`/api/voice/${postId}/vote`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ vote_type: voteType })
+            });
+            if (!resp.ok) throw new Error('Vote failed');
+            // Reload the detail view
+            selectPost(postId);
+            // Also refresh the list to update vote count
+            loadPosts();
+        } catch (err) {
+            alert('Failed to vote. Please try again.');
+        }
+    }
+
+    // =====================================================================
+    // ADD COMMENT
+    // =====================================================================
+    async function addComment(postId) {
+        const input = document.getElementById('commentInput');
+        if (!input) return;
+        const content = input.value.trim();
+        if (!content) return;
+
+        try {
+            const resp = await fetch(`/api/voice/${postId}/comments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || 'Failed to add comment');
+            }
+            input.value = '';
+            selectPost(postId);
+            loadPosts(); // refresh comment count
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // =====================================================================
+    // CHANGE STATUS (publisher only)
+    // =====================================================================
+    async function changeStatus(postId, status) {
+        try {
+            await fetch(`/api/voice/${postId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status })
+            });
+            loadPosts();
+            selectPost(postId);
+        } catch (err) {
+            alert('Failed to update status.');
+        }
+    }
+
+    // =====================================================================
+    // DELETE POST
+    // =====================================================================
+    async function deleteVoicePost(postId) {
+        if (!confirm('Are you sure you want to delete this post?')) return;
+        try {
+            await fetch(`/api/voice/${postId}`, { method: 'DELETE' });
+            selectedPostId = null;
+            loadPosts();
+            document.getElementById('voiceDetail').innerHTML = `
+                <div class="voice-detail-empty">
+                    <div class="icon">💬</div>
+                    <p style="font-weight:600;font-size:15px;">Select a post to view</p>
+                    <p style="font-size:13px;margin-top:4px;">Click on any topic from the list</p>
+                </div>`;
+        } catch (err) {
+            alert('Failed to delete post.');
+        }
+    }
+
+    // =====================================================================
+    // NEW POST MODAL
+    // =====================================================================
+    function openNewPostModal() {
+        document.getElementById('newPostModal').classList.add('active');
+        document.getElementById('postTitle').focus();
+    }
+
+    function closeNewPostModal() {
+        document.getElementById('newPostModal').classList.remove('active');
+        document.getElementById('postTitle').value = '';
+        document.getElementById('postContent').value = '';
+    }
+
+    async function submitVoicePost() {
+        const title = document.getElementById('postTitle').value.trim();
+        const content = document.getElementById('postContent').value.trim();
+        const category = document.getElementById('postCategory').value;
+
+        if (!title) { alert('Please enter a title.'); return; }
+        if (!content) { alert('Please enter some content.'); return; }
+
+        try {
+            const resp = await fetch('/api/voice', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, content, category })
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || 'Failed to create post');
+            }
+            closeNewPostModal();
+            loadPosts();
+            // Select the newest post
+            setTimeout(() => {
+                if (allPosts.length > 0) selectPost(allPosts[0].id);
+            }, 300);
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Close modal on overlay click
+    document.addEventListener('click', function(e) {
+        if (e.target.id === 'newPostModal') closeNewPostModal();
+    });
+
+    // =====================================================================
+    // FILTER
+    // =====================================================================
+    function filterCategory(category) {
+        currentCategory = category;
+        document.querySelectorAll('.voice-pill').forEach(p => {
+            p.classList.toggle('active', p.getAttribute('data-category') === category);
+        });
+        selectedPostId = null;
+        document.getElementById('voiceDetail').innerHTML = `
+            <div class="voice-detail-empty">
+                <div class="icon">💬</div>
+                <p style="font-weight:600;font-size:15px;">Select a post to view</p>
+                <p style="font-size:13px;margin-top:4px;">Click on any topic from the list</p>
+            </div>`;
+        loadPosts();
+    }
+
+    // =====================================================================
+    // HELPERS
+    // =====================================================================
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatTimeAgo(dateStr) {
+        if (!dateStr) return '';
+        const now = new Date();
+        // Handle SQLite format "YYYY-MM-DD HH:MM:SS" by replacing space with T
+        const normalized = dateStr.replace(' ', 'T');
+        const date = new Date(normalized);
+        if (isNaN(date.getTime())) return dateStr;
+        const diff = Math.floor((now - date) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+</script>
+{% endblock %}

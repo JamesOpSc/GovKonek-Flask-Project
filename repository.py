@@ -421,3 +421,211 @@ class DocumentRepository:
         ).fetchall()
         conn.close()
         return [c['category'] for c in cats]
+
+
+# ===========================================================================
+# VoiceRepository — Citizens' Voice forum
+# ===========================================================================
+
+class VoiceRepository:
+    """Repository for Citizens' Voice forum operations."""
+
+    def __init__(self, db_path=None):
+        self._db_path = db_path or DATABASE_NAME
+
+    def _get_db(self):
+        return _connect(self._db_path)
+
+    # -- voice posts CRUD ------------------------------------------------
+
+    def get_all(self, category=None, status=None):
+        """Fetch all voice posts with author names, newest first. Optional filters."""
+        conn = self._get_db()
+        query = '''
+            SELECT vp.*, u.username as author_name, u.role as author_role,
+                   (SELECT COUNT(*) FROM voice_comments vc WHERE vc.voice_post_id = vp.id) as comment_count
+            FROM voice_posts vp
+            JOIN users u ON vp.user_id = u.id
+            WHERE 1=1
+        '''
+        params = []
+        if category:
+            query += ' AND vp.category = ?'
+            params.append(category)
+        if status:
+            query += ' AND vp.status = ?'
+            params.append(status)
+        query += ' ORDER BY vp.created_at DESC'
+        posts = conn.execute(query, params).fetchall()
+        conn.close()
+        return [dict(p) for p in posts]
+
+    def get_by_id(self, voice_post_id):
+        """Fetch a single voice post with author info."""
+        conn = self._get_db()
+        post = conn.execute('''
+            SELECT vp.*, u.username as author_name, u.role as author_role,
+                   (SELECT COUNT(*) FROM voice_comments vc WHERE vc.voice_post_id = vp.id) as comment_count
+            FROM voice_posts vp
+            JOIN users u ON vp.user_id = u.id
+            WHERE vp.id = ?
+        ''', (voice_post_id,)).fetchone()
+        conn.close()
+        return dict(post) if post else None
+
+    def create(self, user_id, title, content, category='General'):
+        """Create a new voice post. Returns the created post as a dict."""
+        conn = self._get_db()
+        try:
+            cursor = conn.execute(
+                'INSERT INTO voice_posts (user_id, title, content, category) VALUES (?, ?, ?, ?)',
+                (user_id, title, content, category)
+            )
+            conn.commit()
+            post_id = cursor.lastrowid
+            post = conn.execute('''
+                SELECT vp.*, u.username as author_name, u.role as author_role, 0 as comment_count
+                FROM voice_posts vp
+                JOIN users u ON vp.user_id = u.id
+                WHERE vp.id = ?
+            ''', (post_id,)).fetchone()
+            return dict(post) if post else None
+        finally:
+            conn.close()
+
+    def update_status(self, voice_post_id, status):
+        """Update the status of a voice post (open/resolved/closed)."""
+        conn = self._get_db()
+        try:
+            conn.execute(
+                'UPDATE voice_posts SET status = ? WHERE id = ?',
+                (status, voice_post_id)
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def delete(self, voice_post_id, user_id):
+        """Delete a voice post. Only the author can delete."""
+        conn = self._get_db()
+        try:
+            conn.execute(
+                'DELETE FROM voice_posts WHERE id = ? AND user_id = ?',
+                (voice_post_id, user_id)
+            )
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+
+    def get_categories(self):
+        """Get distinct categories used in voice posts."""
+        conn = self._get_db()
+        cats = conn.execute(
+            'SELECT DISTINCT category FROM voice_posts ORDER BY category'
+        ).fetchall()
+        conn.close()
+        return [c['category'] for c in cats]
+
+    # -- voice comments --------------------------------------------------
+
+    def get_comments(self, voice_post_id):
+        """Fetch all comments for a voice post with author info."""
+        conn = self._get_db()
+        comments = conn.execute('''
+            SELECT vc.*, u.username as author_name, u.role as author_role
+            FROM voice_comments vc
+            JOIN users u ON vc.user_id = u.id
+            WHERE vc.voice_post_id = ?
+            ORDER BY vc.created_at ASC
+        ''', (voice_post_id,)).fetchall()
+        conn.close()
+        return [dict(c) for c in comments]
+
+    def add_comment(self, voice_post_id, user_id, content, is_official=False):
+        """Add a comment to a voice post. Returns the new comment as a dict."""
+        conn = self._get_db()
+        try:
+            cursor = conn.execute(
+                'INSERT INTO voice_comments (voice_post_id, user_id, content, is_official) VALUES (?, ?, ?, ?)',
+                (voice_post_id, user_id, content, 1 if is_official else 0)
+            )
+            conn.commit()
+            comment_id = cursor.lastrowid
+            comment = conn.execute('''
+                SELECT vc.*, u.username as author_name, u.role as author_role
+                FROM voice_comments vc
+                JOIN users u ON vc.user_id = u.id
+                WHERE vc.id = ?
+            ''', (comment_id,)).fetchone()
+            return dict(comment) if comment else None
+        finally:
+            conn.close()
+
+    # -- voice votes -----------------------------------------------------
+
+    def get_user_vote(self, voice_post_id, user_id):
+        """Get the vote type a user cast on a voice post, or None."""
+        conn = self._get_db()
+        vote = conn.execute(
+            'SELECT vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
+            (voice_post_id, user_id)
+        ).fetchone()
+        conn.close()
+        return vote['vote_type'] if vote else None
+
+    def toggle_vote(self, voice_post_id, user_id, vote_type):
+        """
+        Toggle a vote on a voice post:
+          - same vote_type → remove (returns 'removed')
+          - different     → update (returns 'changed')
+          - none          → add    (returns 'added')
+        Returns (action, net_change) where net_change is the delta to apply to vote_count.
+        """
+        conn = self._get_db()
+        try:
+            existing = conn.execute(
+                'SELECT id, vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
+                (voice_post_id, user_id)
+            ).fetchone()
+
+            if existing:
+                if existing['vote_type'] == vote_type:
+                    # Remove vote
+                    conn.execute('DELETE FROM voice_votes WHERE id = ?', (existing['id'],))
+                    delta = -1 if vote_type == 'up' else 1
+                    conn.execute(
+                        'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
+                        (delta, voice_post_id)
+                    )
+                    conn.commit()
+                    return 'removed', delta
+                else:
+                    # Change vote
+                    conn.execute(
+                        'UPDATE voice_votes SET vote_type = ? WHERE id = ?',
+                        (vote_type, existing['id'])
+                    )
+                    delta = 2 if vote_type == 'up' else -2
+                    conn.execute(
+                        'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
+                        (delta, voice_post_id)
+                    )
+                    conn.commit()
+                    return 'changed', delta
+            else:
+                # Add vote
+                conn.execute(
+                    'INSERT INTO voice_votes (voice_post_id, user_id, vote_type) VALUES (?, ?, ?)',
+                    (voice_post_id, user_id, vote_type)
+                )
+                delta = 1 if vote_type == 'up' else -1
+                conn.execute(
+                    'UPDATE voice_posts SET vote_count = vote_count + ? WHERE id = ?',
+                    (delta, voice_post_id)
+                )
+                conn.commit()
+                return 'added', delta
+        finally:
+            conn.close()

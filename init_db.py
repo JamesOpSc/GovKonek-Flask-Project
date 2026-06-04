@@ -99,6 +99,49 @@ def create_database():
         )
     ''')
 
+    # -- Citizens' Voice Posts -------------------------------------------
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS voice_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'General',
+            status TEXT DEFAULT 'open',
+            vote_count INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # -- Citizens' Voice Comments ----------------------------------------
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS voice_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            voice_post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            is_official INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (voice_post_id) REFERENCES voice_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # -- Citizens' Voice Votes -------------------------------------------
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS voice_votes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            voice_post_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            vote_type TEXT NOT NULL CHECK(vote_type IN ('up', 'down')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (voice_post_id) REFERENCES voice_posts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            UNIQUE(voice_post_id, user_id)
+        )
+    ''')
+
     # ===================================================================
     # SEED DATA
     # ===================================================================
@@ -210,6 +253,51 @@ def create_database():
                 ('Barangay Disaster Risk Reduction Plan 2026',
                  'Comprehensive disaster preparedness and response plan including evacuation routes, emergency contacts, and resource inventory.',
                  'Disaster Preparedness', '#', '4.5 MB', '2026-01-15'),
+            ]
+        )
+
+    # -- Seed citizens' voice posts --------------------------------------
+    cursor.execute('SELECT COUNT(*) FROM voice_posts')
+    if cursor.fetchone()[0] == 0:
+        citizen = cursor.execute(
+            "SELECT id FROM users WHERE role = 'citizen' LIMIT 1"
+        ).fetchone()
+        citizen_id = citizen['id'] if citizen else 2
+
+        cursor.executemany(
+            '''INSERT INTO voice_posts (user_id, title, content, category, status, vote_count)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            [
+                (citizen_id, 'Illegal Dumping at Purok 4 Creek',
+                 'May mga nagtatapon ng basura sa creek malapit sa Purok 4. Nagdudulot ito ng masamang amoy at posibleng pagbaha. Pakiusap sana ay maaksyunan ito agad.',
+                 'Grievance', 'open', 12),
+                (citizen_id, 'Suggestion: Weekend Market sa Plaza',
+                 'Magandang ideya siguro kung magkakaroon tayo ng weekend market sa barangay plaza para sa mga local vendors at farmers. Makakatulong ito sa ekonomiya ng barangay.',
+                 'Suggestion', 'open', 8),
+                (citizen_id, 'Tanong: Schedule ng Libreng Bakuna',
+                 'Kailan po ang susunod na libreng bakuna para sa mga bata at senior citizens? May bagong schedule na po ba?',
+                 'Question', 'open', 5),
+                (citizen_id, 'Pasasalamat sa Bagong Street Lights',
+                 'Gusto ko lang magpasalamat sa barangay captain at council para sa bagong street lights sa Zone 5. Malaking tulong ito sa seguridad namin sa gabi. Maraming salamat po!',
+                 'General', 'open', 15),
+                (publisher_id, 'Barangay Assembly This Saturday',
+                 'Inaanyayahan ang lahat ng residents na dumalo sa ating quarterly Barangay Assembly ngayong Sabado, 9AM sa Covered Court. Pag-uusapan ang mga ongoing projects at concerns ng komunidad.',
+                 'Announcement', 'open', 20),
+                (citizen_id, 'Tricycle Terminal sa Kanto ng Purok 2',
+                 'Ang daming nakaparadang tricycle sa kanto ng Purok 2 na nakakaabala sa daloy ng trapiko. Sana magkaroon ng designated terminal para maiwasan ang congestion.',
+                 'Grievance', 'open', 7),
+            ]
+        )
+
+        # -- Seed voice comments -----------------------------------------
+        cursor.executemany(
+            '''INSERT INTO voice_comments (voice_post_id, user_id, content, is_official)
+               VALUES (?, ?, ?, ?)''',
+            [
+                (1, publisher_id, 'Napag-usapan na namin ito sa konseho. Magkakaroon ng cleanup drive sa Sabado at maglalagay tayo ng warning signs. Salamat sa pag-report.', 1),
+                (2, publisher_id, 'Magandang suggestion! Pag-aaralan namin ito sa susunod na council meeting. Kailangan lang natin ng permits mula sa city hall.', 1),
+                (1, citizen_id, 'Salamat po sa mabilis na aksyon, Kap! Sana matuloy ang cleanup drive.', 0),
+                (4, publisher_id, 'Maraming salamat sa inyong appreciation. Tuloy-tuloy lang ang serbisyo para sa barangay!', 1),
             ]
         )
 

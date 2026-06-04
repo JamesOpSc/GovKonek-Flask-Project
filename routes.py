@@ -18,7 +18,7 @@ from flask_login import login_required, login_user, logout_user, current_user
 def _get_services():
     """
     Convenience helper: fetch injected services from the Flask app.
-    Returns a dict with keys: auth, posts, post_repo, project_repo, service_repo, document_repo.
+    Returns a dict with keys: auth, posts, post_repo, project_repo, service_repo, document_repo, voice, voice_repo.
     """
     ext = current_app.extensions
     return {
@@ -28,6 +28,8 @@ def _get_services():
         'project_repo': ext['project_repo'],
         'service_repo': ext['service_repo'],
         'document_repo': ext['document_repo'],
+        'voice': ext['voice_service'],
+        'voice_repo': ext['voice_repo'],
     }
 
 
@@ -321,3 +323,102 @@ def create_routes(app):
             })
         except requests.exceptions.RequestException as e:
             return jsonify({'error': f'Weather service unavailable: {str(e)}'}), 502
+
+    # ================================================================
+    # CITIZENS' VOICE — Community Forum
+    # ================================================================
+
+    @app.route('/citizens-voice')
+    @login_required
+    def citizens_voice():
+        """Citizens' Voice community forum page."""
+        return render_template('citizens_voice.html',
+                               name=current_user.username,
+                               role=current_user.role,
+                               user_id=current_user.id)
+
+    # -- Voice Posts API ------------------------------------------------
+
+    @app.route('/api/voice')
+    @login_required
+    def api_get_voice_posts():
+        """API: Get all voice posts, optionally filtered."""
+        category = request.args.get('category')
+        status = request.args.get('status')
+        svc = _get_services()
+        posts = svc['voice'].get_posts(category=category, status=status)
+        return jsonify({'posts': posts})
+
+    @app.route('/api/voice/<int:post_id>')
+    @login_required
+    def api_get_voice_post(post_id):
+        """API: Get a single voice post with comments and user's vote."""
+        svc = _get_services()
+        detail = svc['voice'].get_post_detail(post_id, current_user.id)
+        if not detail:
+            return jsonify({'error': 'Post not found'}), 404
+        return jsonify(detail)
+
+    @app.route('/api/voice', methods=['POST'])
+    @login_required
+    def api_create_voice_post():
+        """API: Create a new voice post. Any authenticated user can post."""
+        data = request.get_json()
+        title = data.get('title', '') if data else ''
+        content = data.get('content', '') if data else ''
+        category = data.get('category', 'General') if data else 'General'
+        svc = _get_services()
+        post, error = svc['voice'].create_post(current_user.id, title, content, category)
+        if error:
+            return jsonify({'error': error}), 400
+        return jsonify({'post': post}), 201
+
+    @app.route('/api/voice/<int:post_id>/status', methods=['PUT'])
+    @login_required
+    def api_update_voice_status(post_id):
+        """API: Update a voice post's status (open/resolved/closed)."""
+        data = request.get_json()
+        status = data.get('status', '') if data else ''
+        svc = _get_services()
+        success, error = svc['voice'].update_status(post_id, status)
+        if error:
+            return jsonify({'error': error}), 400
+        return jsonify({'success': True})
+
+    @app.route('/api/voice/<int:post_id>', methods=['DELETE'])
+    @login_required
+    def api_delete_voice_post(post_id):
+        """API: Delete a voice post. Only the author can delete."""
+        svc = _get_services()
+        success, error = svc['voice'].delete_post(post_id, current_user.id)
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'success': True})
+
+    # -- Voice Comments API --------------------------------------------
+
+    @app.route('/api/voice/<int:post_id>/comments', methods=['POST'])
+    @login_required
+    def api_add_voice_comment(post_id):
+        """API: Add a comment to a voice post."""
+        data = request.get_json()
+        content = data.get('content', '') if data else ''
+        svc = _get_services()
+        comment, error = svc['voice'].add_comment(post_id, current_user.id, content, current_user.role)
+        if error:
+            return jsonify({'error': error}), 400
+        return jsonify({'comment': comment}), 201
+
+    # -- Voice Votes API -----------------------------------------------
+
+    @app.route('/api/voice/<int:post_id>/vote', methods=['POST'])
+    @login_required
+    def api_toggle_voice_vote(post_id):
+        """API: Toggle up/down vote on a voice post."""
+        data = request.get_json()
+        vote_type = data.get('vote_type', '') if data else ''
+        svc = _get_services()
+        result, error = svc['voice'].toggle_vote(post_id, current_user.id, vote_type)
+        if error:
+            return jsonify({'error': error}), 400
+        return jsonify(result)

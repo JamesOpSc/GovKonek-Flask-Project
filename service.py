@@ -175,3 +175,94 @@ class PostService:
         return True, None
 
     # PostService: no static wrappers needed — routes use injected instances.
+
+
+# ===========================================================================
+# VoiceService — Citizens' Voice forum business logic
+# ===========================================================================
+
+class VoiceService:
+    """
+    Business logic for the Citizens' Voice forum.
+
+    Any authenticated user can post topics, comment, and vote.
+    Publisher (barangay captain) comments are flagged as official responses.
+    """
+
+    CATEGORIES = ['General', 'Grievance', 'Suggestion', 'Question', 'Announcement']
+    VALID_STATUSES = {'open', 'resolved', 'closed'}
+
+    def __init__(self, voice_repo=None):
+        """
+        @param voice_repo: VoiceRepository instance.
+        """
+        from repository import VoiceRepository
+        self._repo = voice_repo or VoiceRepository()
+
+    # -- voice posts -----------------------------------------------------
+
+    def get_posts(self, category=None, status=None):
+        """Get all voice posts, optionally filtered."""
+        return self._repo.get_all(category=category, status=status)
+
+    def get_post_detail(self, voice_post_id, user_id=None):
+        """Get a voice post with comments and user's vote."""
+        post = self._repo.get_by_id(voice_post_id)
+        if not post:
+            return None
+        return {
+            'post': post,
+            'comments': self._repo.get_comments(voice_post_id),
+            'user_vote': self._repo.get_user_vote(voice_post_id, user_id) if user_id else None,
+        }
+
+    def create_post(self, user_id, title, content, category='General'):
+        """Create a new voice post. Returns (post_dict, error)."""
+        if not title or not title.strip():
+            return None, "Title is required."
+        if not content or not content.strip():
+            return None, "Content is required."
+        if category not in self.CATEGORIES:
+            category = 'General'
+        post = self._repo.create(user_id, title.strip(), content.strip(), category)
+        return (post, None) if post else (None, "Failed to create post.")
+
+    def update_status(self, voice_post_id, status):
+        """Update a voice post's status. Returns (success, error)."""
+        if status not in self.VALID_STATUSES:
+            return False, f"Invalid status. Must be one of: {', '.join(self.VALID_STATUSES)}"
+        self._repo.update_status(voice_post_id, status)
+        return True, None
+
+    def delete_post(self, voice_post_id, user_id):
+        """Delete a voice post. Only the original author can delete. Returns (success, error)."""
+        self._repo.delete(voice_post_id, user_id)
+        return True, None
+
+    # -- comments --------------------------------------------------------
+
+    def add_comment(self, voice_post_id, user_id, content, role):
+        """Add a comment. Publisher comments are marked official. Returns (comment_dict, error)."""
+        if not content or not content.strip():
+            return None, "Comment cannot be empty."
+        is_official = (role == 'publisher')
+        comment = self._repo.add_comment(voice_post_id, user_id, content.strip(), is_official)
+        return (comment, None) if comment else (None, "Failed to add comment.")
+
+    # -- votes -----------------------------------------------------------
+
+    def toggle_vote(self, voice_post_id, user_id, vote_type):
+        """Toggle up/down vote. Returns (result_dict, error)."""
+        if vote_type not in ('up', 'down'):
+            return None, "Vote must be 'up' or 'down'."
+        action, delta = self._repo.toggle_vote(voice_post_id, user_id, vote_type)
+        user_vote = self._repo.get_user_vote(voice_post_id, user_id)
+        return {
+            'action': action,
+            'net_change': delta,
+            'user_vote': user_vote,
+        }, None
+
+    def get_categories(self):
+        """Return the list of valid categories."""
+        return self.CATEGORIES
