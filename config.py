@@ -38,6 +38,7 @@ class Config:
             'GOVKONEK_SECRET_KEY', 'govkonek_super_secret_key'
         )
         self.login_view = login_view or 'login'
+        self.openweather_api_key = os.environ.get('OPENWEATHER_API_KEY', '')
 
 
 # Singleton default config for backward compatibility and simple usage

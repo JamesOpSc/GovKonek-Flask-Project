@@ -1,11 +1,25 @@
 <style>
     .weather-widget {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%); /* Dark slate gradient for stormy weather */
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
         color: white;
         border: none;
         padding: 20px;
+        transition: background 0.5s ease;
     }
-    
+
+    .weather-widget.clear {
+        background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
+    }
+    .weather-widget.cloudy {
+        background: linear-gradient(135deg, #64748b 0%, #94a3b8 100%);
+    }
+    .weather-widget.rain {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    }
+    .weather-widget.storm {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+
     .weather-header {
         display: flex;
         justify-content: space-between;
@@ -15,36 +29,439 @@
         padding-bottom: 10px;
     }
 
+    .weather-location-prompt {
+        text-align: center;
+        padding: 15px 0;
+    }
+
+    .weather-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 10px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 13px;
+        transition: all 0.2s;
+        margin: 4px;
+    }
+    .weather-btn:hover {
+        background: rgba(255, 255, 255, 0.35);
+        transform: translateY(-1px);
+    }
+    .weather-btn.primary {
+        background: rgba(255, 255, 255, 0.9);
+        color: #1e293b;
+        border: none;
+    }
+    .weather-btn.primary:hover {
+        background: white;
+    }
+
+    .weather-city-input {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        font-size: 14px;
+        outline: none;
+        margin: 8px 0;
+        transition: border-color 0.2s;
+    }
+    .weather-city-input::placeholder {
+        color: rgba(255, 255, 255, 0.5);
+    }
+    .weather-city-input:focus {
+        border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .weather-main {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .weather-icon {
+        font-size: 48px;
+        line-height: 1;
+    }
+
+    .weather-temp {
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    .weather-desc {
+        font-size: 14px;
+        color: #cbd5e1;
+        text-transform: capitalize;
+    }
+
+    .weather-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 12px;
+        color: #94a3b8;
+        margin-bottom: 15px;
+    }
+    .weather-meta span {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 4px 10px;
+        border-radius: 20px;
+    }
+
     .weather-forecast {
         display: flex;
-        gap: 15px;
+        gap: 8px;
+    }
+    .forecast-day {
+        flex: 1;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 10px 6px;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 12px;
+        min-width: 0;
+    }
+    .forecast-day .day-label {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #e2e8f0;
+    }
+    .forecast-day .day-icon {
+        font-size: 20px;
+        margin: 4px 0;
+    }
+    .forecast-day .day-temp {
+        font-weight: 700;
+        color: white;
+    }
+    .forecast-day .day-precip {
+        color: #7dd3fc;
+        font-size: 11px;
+    }
+
+    .weather-error {
+        text-align: center;
+        color: #fca5a5;
+        padding: 10px 0;
         font-size: 13px;
-        color: #cbd5e1;
+    }
+
+    .weather-spinner {
+        text-align: center;
+        padding: 20px 0;
+    }
+    .weather-spinner .dot-pulse {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.6);
+        animation: pulse 1.2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1); }
     }
 </style>
 
-<div class="card weather-widget">
-    <div class="weather-header">
-        <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; text-transform: uppercase;">📍 Quezon City</span>
-        <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px;">Live</span>
-    </div>
-    
-    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-        <div style="font-size: 42px; line-height: 1;">⛈️</div>
-        <div>
-            <h3 style="font-size: 22px; font-weight: 700; margin-bottom: 2px;">Heavy Rain</h3>
-            <p style="font-size: 14px; color: #94a3b8;">High risk of localized flooding.</p>
+<div class="card weather-widget" id="weatherWidget">
+    <!-- Initial prompt state -->
+    <div id="weatherPrompt">
+        <div class="weather-header">
+            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; text-transform: uppercase;">🌤️ Live Weather</span>
+            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px;">GPS</span>
+        </div>
+        <div class="weather-location-prompt">
+            <p style="margin-bottom: 12px; font-size: 14px; color: #e2e8f0;">Allow location access for local weather?</p>
+            <button class="weather-btn primary" onclick="requestLocation()">
+                📍 Use My Location
+            </button>
+            <button class="weather-btn" onclick="showCityInput()">
+                🏙️ Enter City
+            </button>
+        </div>
+        <div id="cityInputArea" style="display: none;">
+            <input
+                type="text"
+                id="cityNameInput"
+                class="weather-city-input"
+                placeholder="Enter city name (e.g., Quezon City)"
+                onkeydown="if(event.key==='Enter') fetchWeatherByCity()"
+            />
+            <button class="weather-btn primary" onclick="fetchWeatherByCity()" style="width:100%;">
+                🔍 Get Weather
+            </button>
         </div>
     </div>
 
-    <div class="weather-forecast">
-        <div style="flex: 1; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; text-align: center;">
-            <div style="margin-bottom: 5px;">Today</div>
-            <div style="font-weight: 700; color: white;">100% 🌧️</div>
-        </div>
-        <div style="flex: 1; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; text-align: center;">
-            <div style="margin-bottom: 5px;">Tomorrow</div>
-            <div style="font-weight: 700; color: white;">80% 🌧️</div>
+    <!-- Loading state (hidden by default) -->
+    <div id="weatherLoading" style="display: none;">
+        <div class="weather-spinner">
+            <p style="margin-bottom: 10px; font-size: 14px;">Fetching weather data...</p>
+            <span class="dot-pulse"></span>
         </div>
     </div>
+
+    <!-- Weather display (hidden by default) -->
+    <div id="weatherDisplay" style="display: none;">
+        <div class="weather-header">
+            <span id="weatherCity" style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; text-transform: uppercase;">📍 --</span>
+            <span style="font-size: 12px; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px;">Live</span>
+        </div>
+
+        <div class="weather-main">
+            <div class="weather-icon" id="weatherIcon">--</div>
+            <div>
+                <div class="weather-temp" id="weatherTemp">--°C</div>
+                <div class="weather-desc" id="weatherDesc">--</div>
+            </div>
+        </div>
+
+        <div class="weather-meta">
+            <span id="weatherHumidity">💧 --%</span>
+            <span id="weatherWind">💨 -- km/h</span>
+        </div>
+
+        <div class="weather-forecast" id="weatherForecast"></div>
+
+        <div style="margin-top: 12px; text-align: right;">
+            <button class="weather-btn" onclick="resetWeather()" style="font-size: 11px; padding: 6px 12px;">
+                🔄 Change Location
+            </button>
+        </div>
+    </div>
+
+    <!-- Error state (hidden by default) -->
+    <div id="weatherError" style="display: none;">
+        <div class="weather-header">
+            <span style="font-weight: 600; font-size: 14px; letter-spacing: 0.5px; text-transform: uppercase;">🌤️ Live Weather</span>
+        </div>
+        <div class="weather-error" id="weatherErrorMsg"></div>
+        <button class="weather-btn" onclick="resetWeather()" style="width:100%; margin-top: 8px;">🔄 Try Again</button>
+    </div>
 </div>
+
+<script>
+    // =========================================================================
+    // WMO Weather Code → emoji + description mapping
+    // =========================================================================
+    const WMO_MAP = {
+        0:  { emoji: '☀️',  desc: 'Clear sky',        css: 'clear' },
+        1:  { emoji: '🌤️',  desc: 'Mostly clear',      css: 'clear' },
+        2:  { emoji: '⛅',  desc: 'Partly cloudy',     css: 'cloudy' },
+        3:  { emoji: '☁️',  desc: 'Overcast',          css: 'cloudy' },
+        45: { emoji: '🌫️',  desc: 'Foggy',             css: 'cloudy' },
+        48: { emoji: '🌫️',  desc: 'Depositing rime fog', css: 'cloudy' },
+        51: { emoji: '🌦️',  desc: 'Light drizzle',     css: 'rain' },
+        53: { emoji: '🌦️',  desc: 'Moderate drizzle',  css: 'rain' },
+        55: { emoji: '🌧️',  desc: 'Dense drizzle',     css: 'rain' },
+        61: { emoji: '🌦️',  desc: 'Slight rain',       css: 'rain' },
+        63: { emoji: '🌧️',  desc: 'Moderate rain',     css: 'rain' },
+        65: { emoji: '🌧️',  desc: 'Heavy rain',        css: 'rain' },
+        71: { emoji: '❄️',  desc: 'Slight snow',       css: 'cloudy' },
+        73: { emoji: '🌨️',  desc: 'Moderate snow',     css: 'cloudy' },
+        75: { emoji: '🌨️',  desc: 'Heavy snow',        css: 'cloudy' },
+        77: { emoji: '❄️',  desc: 'Snow grains',       css: 'cloudy' },
+        80: { emoji: '🌦️',  desc: 'Slight rain showers', css: 'rain' },
+        81: { emoji: '🌧️',  desc: 'Moderate rain showers', css: 'rain' },
+        82: { emoji: '⛈️',  desc: 'Violent rain showers', css: 'storm' },
+        85: { emoji: '🌨️',  desc: 'Slight snow showers', css: 'cloudy' },
+        86: { emoji: '🌨️',  desc: 'Heavy snow showers', css: 'cloudy' },
+        95: { emoji: '⛈️',  desc: 'Thunderstorm',      css: 'storm' },
+        96: { emoji: '⛈️',  desc: 'Thunderstorm + slight hail', css: 'storm' },
+        99: { emoji: '⛈️',  desc: 'Thunderstorm + heavy hail', css: 'storm' },
+    };
+
+    function getWeatherInfo(code) {
+        return WMO_MAP[code] || { emoji: '🌡️', desc: 'Unknown', css: 'cloudy' };
+    }
+
+    function getDayLabel(dateStr, index) {
+        if (index === 0) return 'Today';
+        if (index === 1) return 'Tomorrow';
+        const d = new Date(dateStr + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { weekday: 'short' });
+    }
+
+    // =========================================================================
+    // State management
+    // =========================================================================
+    function showState(stateId) {
+        ['weatherPrompt', 'weatherLoading', 'weatherDisplay', 'weatherError'].forEach(id => {
+            document.getElementById(id).style.display = (id === stateId) ? 'block' : 'none';
+        });
+    }
+
+    function resetWeather() {
+        document.getElementById('cityInputArea').style.display = 'none';
+        document.getElementById('cityNameInput').value = '';
+        showState('weatherPrompt');
+        // Reset widget CSS class
+        document.getElementById('weatherWidget').className = 'card weather-widget';
+    }
+
+    function showCityInput() {
+        document.getElementById('cityInputArea').style.display = 'block';
+        document.getElementById('cityNameInput').focus();
+    }
+
+    // =========================================================================
+    // Fetch weather by lat/lon from our backend
+    // =========================================================================
+    async function fetchWeather(lat, lon, cityLabel) {
+        showState('weatherLoading');
+
+        try {
+            const resp = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+            if (!resp.ok) {
+                const err = await resp.json();
+                throw new Error(err.error || 'Failed to fetch weather');
+            }
+            const data = await resp.json();
+            renderWeather(data, cityLabel);
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    // =========================================================================
+    // Fetch weather by city name (geocoding → weather)
+    // =========================================================================
+    async function fetchWeatherByCity() {
+        const city = document.getElementById('cityNameInput').value.trim();
+        if (!city) return;
+
+        showState('weatherLoading');
+
+        try {
+            // Use Open-Meteo Geocoding API (free, no key)
+            const geocodeUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en`;
+            const geoResp = await fetch(geocodeUrl);
+            if (!geoResp.ok) throw new Error('Geocoding service unavailable');
+            const geoData = await geoResp.json();
+
+            if (!geoData.results || geoData.results.length === 0) {
+                throw new Error(`City "${city}" not found. Try a nearby city.`);
+            }
+
+            const place = geoData.results[0];
+            const label = `${place.name}${place.admin1 ? ', ' + place.admin1 : ''}${place.country ? ', ' + place.country : ''}`;
+            await fetchWeather(place.latitude, place.longitude, label);
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    // =========================================================================
+    // Request browser geolocation
+    // =========================================================================
+    function requestLocation() {
+        if (!navigator.geolocation) {
+            showCityInput();
+            return;
+        }
+
+        showState('weatherLoading');
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                // Reverse geocode to get city name
+                reverseGeocode(lat, lon).then(label => {
+                    fetchWeather(lat, lon, label);
+                }).catch(() => {
+                    fetchWeather(lat, lon, `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`);
+                });
+            },
+            (err) => {
+                // Geolocation denied or unavailable → fall back to city input
+                resetWeather();
+                showCityInput();
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
+        );
+    }
+
+    // =========================================================================
+    // Reverse geocode: lat/lon → city name using Open-Meteo Geocoding
+    // =========================================================================
+    async function reverseGeocode(lat, lon) {
+        try {
+            const url = `https://geocoding-api.open-meteo.com/v1/search?name=city&count=1&language=en&latitude=${lat}&longitude=${lon}`;
+            // Open-Meteo geocoding doesn't support reverse lookup directly,
+            // so we use Nominatim (OpenStreetMap) for reverse geocoding
+            const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`;
+            const resp = await fetch(nominatimUrl, {
+                headers: { 'Accept-Language': 'en' }
+            });
+            if (!resp.ok) throw new Error('Reverse geocode failed');
+            const data = await resp.json();
+            if (data.address) {
+                const addr = data.address;
+                return addr.city || addr.town || addr.municipality || addr.county || addr.state || data.display_name.split(',')[0];
+            }
+            throw new Error('No address found');
+        } catch {
+            throw new Error('Could not determine city name');
+        }
+    }
+
+    // =========================================================================
+    // Render weather data into the widget
+    // =========================================================================
+    function renderWeather(data, cityLabel) {
+        const current = data.current;
+        const daily = data.daily;
+        const info = getWeatherInfo(current.weather_code);
+
+        // Update location label
+        document.getElementById('weatherCity').textContent = '📍 ' + (cityLabel || 'Your Location');
+
+        // Update current conditions
+        document.getElementById('weatherIcon').textContent = info.emoji;
+        document.getElementById('weatherTemp').textContent = Math.round(current.temperature) + '°C';
+        document.getElementById('weatherDesc').textContent = info.desc;
+        document.getElementById('weatherHumidity').textContent = '💧 ' + current.humidity + '%';
+        document.getElementById('weatherWind').textContent = '💨 ' + Math.round(current.wind_speed) + ' km/h';
+
+        // Apply theme CSS class
+        const widget = document.getElementById('weatherWidget');
+        widget.className = 'card weather-widget ' + info.css;
+
+        // Build forecast
+        let forecastHtml = '';
+        const numDays = Math.min(daily.time.length, 5);
+        for (let i = 0; i < numDays; i++) {
+            const dayInfo = getWeatherInfo(daily.weather_code[i]);
+            forecastHtml += `
+                <div class="forecast-day">
+                    <div class="day-label">${getDayLabel(daily.time[i], i)}</div>
+                    <div class="day-icon">${dayInfo.emoji}</div>
+                    <div class="day-temp">${Math.round(daily.temp_max[i])}° <span style="color:#94a3b8;font-weight:400;">${Math.round(daily.temp_min[i])}°</span></div>
+                    <div class="day-precip">💧 ${daily.precip_prob[i]}%</div>
+                </div>`;
+        }
+        document.getElementById('weatherForecast').innerHTML = forecastHtml;
+
+        // Show display
+        showState('weatherDisplay');
+    }
+
+    // =========================================================================
+    // Show error
+    // =========================================================================
+    function showError(msg) {
+        document.getElementById('weatherErrorMsg').textContent = '⚠️ ' + msg;
+        showState('weatherError');
+    }
+</script>

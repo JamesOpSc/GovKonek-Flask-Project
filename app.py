@@ -138,4 +138,3 @@ def setup_login_manager(app):
 if __name__ == '__main__':
     app = create_app()
     app.run(debug=True)
-    app.run(debug=True)

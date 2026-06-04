@@ -263,3 +263,61 @@ def create_routes(app):
         repo = _get_services()['document_repo']
         documents = repo.get_all()
         return jsonify({'documents': documents})
+
+    # ================================================================
+    # LIVE WEATHER API
+    # ================================================================
+
+    @app.route('/api/weather')
+    @login_required
+    def api_get_weather():
+        """
+        API: Get live weather data for given coordinates using Open-Meteo.
+        Query params: lat (float), lon (float)
+        Returns: temperature, weather code, humidity, wind speed, and forecast.
+        """
+        import requests
+
+        lat = request.args.get('lat', type=float)
+        lon = request.args.get('lon', type=float)
+
+        if lat is None or lon is None:
+            return jsonify({'error': 'lat and lon query parameters are required'}), 400
+
+        try:
+            # Open-Meteo API (free, no API key required)
+            weather_url = (
+                'https://api.open-meteo.com/v1/forecast'
+                f'?latitude={lat}&longitude={lon}'
+                '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m'
+                '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max'
+                '&timezone=auto'
+            )
+            resp = requests.get(weather_url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            current = data.get('current', {})
+            daily = data.get('daily', {})
+
+            return jsonify({
+                'location': {
+                    'lat': lat,
+                    'lon': lon,
+                },
+                'current': {
+                    'temperature': current.get('temperature_2m'),
+                    'humidity': current.get('relative_humidity_2m'),
+                    'wind_speed': current.get('wind_speed_10m'),
+                    'weather_code': current.get('weather_code'),
+                },
+                'daily': {
+                    'time': daily.get('time', []),
+                    'weather_code': daily.get('weather_code', []),
+                    'temp_max': daily.get('temperature_2m_max', []),
+                    'temp_min': daily.get('temperature_2m_min', []),
+                    'precip_prob': daily.get('precipitation_probability_max', []),
+                },
+            })
+        except requests.exceptions.RequestException as e:
+            return jsonify({'error': f'Weather service unavailable: {str(e)}'}), 502
