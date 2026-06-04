@@ -29,29 +29,30 @@ Before you begin, ensure you have the following installed:
 
 1. In VS Code, open a new terminal (`Ctrl` + `` ` ``).
 2. Create the virtual environment by running:
-   ```bash
-   python -m venv venv
-
+   ```
 3. Activate the environment:
    ```bash
-   Windows: venv\Scripts\activate
-   Mac/Linux: source venv/bin/activate
+   # Windows:
+   venv\Scripts\activate
 
-(Success check: You should see (venv) at the beginning of your terminal line).
+   # Mac/Linux:
+   source venv/bin/activate
+   ```
+   *(Success check: You should see `(venv)` at the beginning of your terminal line).*
 
 ## 📦 Step 3: Install Dependencies
 
-1. With your (venv) active, install Flask and our authentication tools:
+1. With your `(venv)` active, install Flask and our project dependencies:
    ```bash
    pip install Flask Flask-Login Werkzeug
 
 ## 🗄️ Step 4: Generate Your Local Database
 
-1. We use a Python script to automatically generate the govkonek.db file and the necessary users table.
+1. We use a Python script to automatically generate the `govkonek.db` file with all necessary tables and sample data (posts, projects, services, documents, and forum topics).
    ```bash
-   Run the initialization script: 
    python init_db.py
-2. You should see a success message, and `govkonek.db` will appear in your files. *(Note: This file is ignored by Git, so your testing data stays local).*
+   ```
+2. You should see `Database and all tables created successfully!`, and `govkonek.db` will appear in your project folder. *(Note: This file is ignored by Git, so your testing data stays local).*
 
 ---
 
@@ -59,4 +60,29 @@ Before you begin, ensure you have the following installed:
 1. Start the Flask application:
    ```bash
    python app.py
-Ctrl + Click the link in the terminal (usually http://127.0.0.1:5000) to open it in your browser.
+   ```
+2. `Ctrl + Click` the link in the terminal (usually `http://127.0.0.1:5000`) to open it in your browser.
+
+---
+
+
+## 📁 Project Structure
+```
+GovKonek-Flask-Project/
+├── app.py              # Flask application factory with dependency injection
+├── config.py           # Injectable Config class (ENCAPSULATION: @property)
+├── exceptions.py       # Custom exception hierarchy (EXCEPTION HANDLING)
+├── init_db.py          # Database initialization & seed data
+├── models.py           # User, CitizenUser, PublisherUser (INHERITANCE + POLYMORPHISM)
+├── repository.py       # Database layer with BaseRepository (ABSTRACTION)
+├── routes.py           # Flask HTTP routes (thin controllers)
+├── service.py          # Business logic layer (Auth, Post, Voice, Project services)
+├── tests/              # Unit & integration tests
+│   ├── test_models.py
+│   ├── test_repository.py
+│   ├── test_config.py
+│   ├── test_exceptions.py
+│   └── test_integration.py
+├── templates/          # Jinja2 HTML templates
+└── static/             # CSS, JS, images
+```
