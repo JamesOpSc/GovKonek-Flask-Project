@@ -29,6 +29,7 @@ def _get_services():
         'project_service': ext['project_service'],
         'service_repo': ext['service_repo'],
         'document_repo': ext['document_repo'],
+        'document_service': ext['document_service'],
         'voice': ext['voice_service'],
         'voice_repo': ext['voice_repo'],
     }
@@ -335,6 +336,43 @@ def create_routes(app):
         repo = _get_services()['document_repo']
         documents = repo.get_all()
         return jsonify({'documents': documents})
+
+    @app.route('/api/documents', methods=['POST'])
+    @login_required
+    def api_create_document():
+        """
+        API: Upload a new transparency document. ONLY publisher can upload.
+
+        Expects multipart/form-data with:
+          - title (str)
+          - description (str)
+          - category (str)
+          - published_date (str, optional)
+          - file (file upload)
+        """
+        title = request.form.get('title', '')
+        description = request.form.get('description', '')
+        category = request.form.get('category', 'General')
+        published_date = request.form.get('published_date', '')
+        uploaded_file = request.files.get('file')
+
+        svc = _get_services()
+        doc, error = svc['document_service'].create_document(
+            current_user, title, description, category, uploaded_file, published_date
+        )
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'document': doc}), 201
+
+    @app.route('/api/documents/<int:document_id>', methods=['DELETE'])
+    @login_required
+    def api_delete_document(document_id):
+        """API: Delete a transparency document. ONLY publisher can delete."""
+        svc = _get_services()
+        success, error = svc['document_service'].delete_document(current_user, document_id)
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'success': True})
 
     # ================================================================
     # LIVE WEATHER API

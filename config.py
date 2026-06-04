@@ -43,6 +43,7 @@ class Config:
         @param secret_key: Flask session signing key (default: from GOVKONEK_SECRET_KEY env)
         @param login_view: Flask-Login redirect endpoint (default: 'login')
         @param openweather_api_key: OpenWeatherMap API key (default: from OPENWEATHER_API_KEY env)
+        @param upload_folder: Directory for uploaded transparency documents (default: 'static/uploads')
         """
         # Private attributes — cannot be modified after construction
         self._db_name = db_name or os.environ.get('GOVKONEK_DB', 'govkonek.db')
@@ -50,9 +51,12 @@ class Config:
             'GOVKONEK_SECRET_KEY', 'govkonek_super_secret_key'
         )
         self._login_view = login_view or 'login'
-        self._openweather_api_key = openweather_api_key or os.environ.get(
-            'OPENWEATHER_API_KEY', ''
+        self._openweather_api_key = openweather_api_key or os.environ.get('OPENWEATHER_API_KEY', '')
+        self._upload_folder = upload_folder or os.environ.get(
+            'GOVKONEK_UPLOAD_FOLDER',
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
         )
+        self._allowed_extensions = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'txt', 'csv'}
 
     # ===================================================================
     # ENCAPSULATION: @property accessors (read-only)
@@ -105,6 +109,26 @@ class Config:
         @return: OpenWeatherMap API key string (may be empty)
         """
         return self._openweather_api_key
+
+    @property
+    def upload_folder(self):
+        """
+        Read-only access to the document upload directory.
+
+        ENCAPSULATION: Prevents changing the upload path at runtime.
+        @return: Absolute path to the uploads directory
+        """
+        return self._upload_folder
+
+    @property
+    def allowed_extensions(self):
+        """
+        Read-only access to the set of allowed file extensions.
+
+        ENCAPSULATION: Prevents bypassing file type validation.
+        @return: Set of allowed lowercase extensions (e.g., {'pdf', 'docx'})
+        """
+        return self._allowed_extensions
 
     # ===================================================================
     # Utility Methods

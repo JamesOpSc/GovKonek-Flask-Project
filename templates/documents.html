@@ -111,7 +111,97 @@
         transition: background 0.2s;
     }
     .doc-download:hover { background: #004085; }
+    .doc-delete {
+        background: #ef4444;
+        color: #fff;
+        border: none;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.2s;
+        margin-left: 6px;
+    }
+    .doc-delete:hover { background: #dc2626; }
     .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
+
+    /* Upload button in header */
+    .upload-btn {
+        background: rgba(255,255,255,0.2);
+        color: #fff;
+        border: 2px solid rgba(255,255,255,0.4);
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .upload-btn:hover { background: rgba(255,255,255,0.3); border-color: #fff; }
+
+    /* Modal overlay */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 100;
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+        background: #fff;
+        border-radius: 16px;
+        padding: 30px;
+        width: 90%;
+        max-width: 560px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 20px; color: #0f172a; }
+    .modal label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 4px; margin-top: 14px; }
+    .modal input, .modal select, .modal textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+    }
+    .modal textarea { resize: vertical; min-height: 80px; }
+    .modal input:focus, .modal select:focus, .modal textarea:focus {
+        outline: none;
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+    .btn-cancel {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-submit {
+        background: #0ea5e9;
+        color: #fff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .btn-submit:hover { background: #0284c7; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+    .file-name { font-size: 12px; color: #0ea5e9; margin-top: 6px; }
+
     @media (max-width: 600px) {
         .doc-card { flex-direction: column; align-items: flex-start; }
         .doc-download { width: 100%; text-align: center; }
@@ -123,7 +213,12 @@
         <h2 style="font-size: 26px; font-weight: 700; margin-bottom: 4px;">🔍 Transparency Documents</h2>
         <p style="opacity: 0.85;">Public records, reports, and ordinances — because accountability matters</p>
     </div>
-    <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+    <div style="display: flex; gap: 10px;">
+        {% if role == 'publisher' %}
+        <button class="upload-btn" onclick="openUploadModal()">📤 Upload Document</button>
+        {% endif %}
+        <a href="{{ url_for('dashboard') }}" class="btn" style="background:rgba(255,255,255,0.15);">← Dashboard</a>
+    </div>
 </div>
 
 <div class="stats-row" id="statsRow">
@@ -162,6 +257,12 @@
     }
 
     function renderDoc(d) {
+        const deleteBtn = {{ 'true' if role == 'publisher' else 'false' }}
+            ? `<button class="doc-delete" onclick="deleteDocument(${d.id}, '${escapeHtml(d.title).replace(/'/g, "\\'")}')">🗑 Delete</button>`
+            : '';
+        const downloadBtn = d.file_url && d.file_url !== '#'
+            ? `<a href="${escapeHtml(d.file_url)}" download class="doc-download" style="text-decoration:none;">⬇ Download</a>`
+            : `<button class="doc-download" onclick="alert('📥 No file attached yet.')">⬇ Download</button>`;
         return `
         <div class="doc-card" data-category="${escapeHtml(d.category)}">
             <div class="doc-icon">${getDocIcon(d.category)}</div>
@@ -174,7 +275,8 @@
                     ${d.file_size ? `<span>📎 ${escapeHtml(d.file_size)}</span>` : ''}
                 </div>
             </div>
-            <button class="doc-download" onclick="alert('📥 Download feature coming soon! Document: ${escapeHtml(d.title).replace(/'/g, "\\'")}')">⬇ Download</button>
+            ${downloadBtn}
+            ${deleteBtn}
         </div>`;
     }
 
@@ -218,4 +320,102 @@
     });
 })();
 </script>
+
+{% if role == 'publisher' %}
+<!-- ================================================================ -->
+<!-- UPLOAD MODAL (publisher only)                                     -->
+<!-- ================================================================ -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal">
+        <h3>📤 Upload Transparency Document</h3>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <label for="docTitle">Document Title *</label>
+            <input type="text" id="docTitle" name="title" placeholder="e.g., Barangay Annual Budget 2026" required>
+
+            <label for="docDesc">Description</label>
+            <textarea id="docDesc" name="description" placeholder="Brief description of the document..."></textarea>
+
+            <label for="docCategory">Category</label>
+            <select id="docCategory" name="category">
+                <option value="Budget Report">💰 Budget Report</option>
+                <option value="Audit Report">🔍 Audit Report</option>
+                <option value="Ordinance">📜 Ordinance</option>
+                <option value="Resolution">📝 Resolution</option>
+                <option value="Procurement">📦 Procurement</option>
+                <option value="Disaster Preparedness">⚠️ Disaster Preparedness</option>
+                <option value="General">📄 General</option>
+            </select>
+
+            <label for="docDate">Published Date</label>
+            <input type="date" id="docDate" name="published_date">
+
+            <label for="docFile">File *</label>
+            <input type="file" id="docFile" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.txt,.csv" required onchange="document.getElementById('fileNameDisplay').textContent = this.files[0]?.name || ''">
+            <div class="file-name" id="fileNameDisplay"></div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn-cancel" onclick="closeUploadModal()">Cancel</button>
+                <button type="submit" class="btn-submit" id="submitBtn">📤 Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openUploadModal() {
+    document.getElementById('uploadModal').classList.add('active');
+    document.getElementById('uploadForm').reset();
+    document.getElementById('fileNameDisplay').textContent = '';
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('active');
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Uploading...';
+
+    const formData = new FormData(this);
+    try {
+        const resp = await fetch('/api/documents', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (resp.ok) {
+            alert('✅ Document uploaded successfully!');
+            closeUploadModal();
+            location.reload();
+        } else {
+            alert('❌ ' + (data.error || 'Upload failed.'));
+        }
+    } catch (err) {
+        alert('❌ Network error. Please try again.');
+    }
+    btn.disabled = false;
+    btn.textContent = '📤 Upload';
+});
+
+async function deleteDocument(docId, docTitle) {
+    if (!confirm(`Delete "${docTitle}"?\nThis will also remove the file from the server.`)) return;
+    try {
+        const resp = await fetch(`/api/documents/${docId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (resp.ok) {
+            alert('✅ Document deleted.');
+            location.reload();
+        } else {
+            alert('❌ ' + (data.error || 'Delete failed.'));
+        }
+    } catch (err) {
+        alert('❌ Network error. Please try again.');
+    }
+}
+
+// Close modal on overlay click
+document.getElementById('uploadModal').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadModal();
+});
+</script>
+{% endif %}
 {% endblock %}

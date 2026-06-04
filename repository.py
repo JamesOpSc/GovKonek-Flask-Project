@@ -538,6 +538,42 @@ class DocumentRepository(BaseRepository):
             'SELECT DISTINCT category FROM documents ORDER BY category', fetch='all'
         )]
 
+    # -- document CRUD (publisher-only mutations) ------------------------
+
+    def create(self, title, description, category, file_url, file_size,
+               published_date, publisher_id):
+        """Create a new transparency document. Returns the created document as a dict."""
+        cursor = self._execute_write(
+            '''INSERT INTO documents
+               (title, description, category, file_url, file_size, published_date)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (title, description, category, file_url, file_size, published_date)
+        )
+        doc = self._execute(
+            'SELECT * FROM documents WHERE id = ?', (cursor.lastrowid,), fetch='one'
+        )
+        return dict(doc) if doc else None
+
+    def get_by_id(self, document_id):
+        """Fetch a single document by ID."""
+        doc = self._execute(
+            'SELECT * FROM documents WHERE id = ?', (document_id,), fetch='one'
+        )
+        return dict(doc) if doc else None
+
+    def delete(self, document_id, publisher_id):
+        """
+        Delete a transparency document.
+
+        @param document_id: ID of the document to delete
+        @param publisher_id: Publisher's user ID (for authorization — kept for
+                             future per-publisher ownership tracking)
+        """
+        self._execute_write(
+            'DELETE FROM documents WHERE id = ?', (document_id,)
+        )
+        return True
+
 
 # ===========================================================================
 # VoiceRepository — Citizens' Voice forum

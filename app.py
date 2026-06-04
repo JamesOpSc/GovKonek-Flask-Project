@@ -25,7 +25,7 @@ from flask import Flask
 from flask_login import LoginManager
 from config import Config, SECRET_KEY, LOGIN_VIEW
 from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository
-from service import AuthService, PostService, VoiceService, ProjectService
+from service import AuthService, PostService, VoiceService, ProjectService, DocumentService
 from models import create_user_from_db
 from routes import create_routes
 
@@ -61,6 +61,7 @@ def _build_services(app, config):
     post_service = PostService(post_repo=post_repo)
     voice_service = VoiceService(voice_repo=voice_repo)
     project_service = ProjectService(project_repo=project_repo)
+    document_service = DocumentService(document_repo=document_repo, config=config)
 
     # -- attach to app ----------------------------------------------------
     app.extensions['config'] = config
@@ -74,6 +75,7 @@ def _build_services(app, config):
     app.extensions['post_service'] = post_service
     app.extensions['voice_service'] = voice_service
     app.extensions['project_service'] = project_service
+    app.extensions['document_service'] = document_service
 
 
 # ===========================================================================

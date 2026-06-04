@@ -373,3 +373,213 @@ class ProjectService:
             return False, "Only the Barangay Captain can delete projects."
         self._repo.delete(project_id, user.id)
         return True, None
+
+
+# ===========================================================================
+# DocumentService — Transparency Documents business logic
+# ===========================================================================
+
+class DocumentService:
+    """
+    Business logic for Transparency Documents.
+
+    Only publisher (barangay captain) can upload, update, or delete documents.
+    All users can view and download documents.
+
+    File Handling (from the crash course):
+      - Validates file extensions against config.allowed_extensions
+      - Saves files to config.upload_folder with unique names
+      - Returns the file path for storage in the database
+    """
+
+    VALID_CATEGORIES = [
+        'Budget Report', 'Audit Report', 'Ordinance', 'Resolution',
+        'Procurement', 'Disaster Preparedness', 'General'
+    ]
+
+    def __init__(self, document_repo=None, config=None):
+        """
+        @param document_repo: DocumentRepository instance
+        @param config: Config instance (for upload_folder and allowed_extensions)
+        """
+        from repository import DocumentRepository
+        self._repo = document_repo or DocumentRepository()
+        self._config = config
+
+    # -- read (all users) ------------------------------------------------
+
+    def get_all(self):
+        """Get all documents, newest first."""
+        return self._repo.get_all()
+
+    def get_by_category(self, category):
+        """Get documents filtered by category."""
+        return self._repo.get_by_category(category)
+
+    def get_categories(self):
+        """Get distinct document categories."""
+        return self._repo.get_categories()
+
+    def get_by_id(self, document_id):
+        """Get a single document by ID."""
+        return self._repo.get_by_id(document_id)
+
+    # -- file validation -------------------------------------------------
+
+    def _validate_file(self, file):
+        """
+        Validate an uploaded file.
+
+        EXCEPTION HANDLING (from lecture):
+          - Checks if a file was actually provided
+          - Validates the file extension against the allowed set
+          - Returns a user-friendly error message
+
+        @param file: Flask FileStorage object from request.files
+        @return: (filename, error) — error is None if valid
+        """
+        if not file or file.filename == '':
+            return None, "No file was selected."
+
+        filename = file.filename
+        if '.' not in filename:
+            return None, "File must have an extension."
+
+        ext = filename.rsplit('.', 1)[1].lower()
+        allowed = self._config.allowed_extensions if self._config else {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'txt', 'csv'}
+
+        if ext not in allowed:
+            return None, f"File type '.{ext}' is not allowed. Allowed: {', '.join(sorted(allowed))}"
+
+        return filename, None
+
+    def _save_file(self, file, filename):
+        """
+        Save an uploaded file with a unique name to prevent overwrites.
+
+        Uses a timestamp prefix to avoid filename collisions.
+
+        @param file: Flask FileStorage object
+        @param filename: Original filename
+        @return: Relative URL path to the saved file (e.g., '/static/uploads/20260604_abc_report.pdf')
+        """
+        import os
+        from datetime import datetime
+
+        upload_folder = self._config.upload_folder if self._config else 'static/uploads'
+
+        # Ensure upload directory exists
+        os.makedirs(upload_folder, exist_ok=True)
+
+        # Generate unique filename: timestamp_originalname
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        safe_name = f"{timestamp}_{filename}"
+
+        filepath = os.path.join(upload_folder, safe_name)
+        file.save(filepath)
+
+        # Return the relative URL for storage in the database
+        return f'/static/uploads/{safe_name}'
+
+    # -- publisher-only mutations ----------------------------------------
+
+    def create_document(self, user, title, description, category, file, published_date=''):
+        """
+        Upload a new transparency document. ONLY publisher can upload.
+
+        POLYMORPHISM: Uses user.can_publish() — same method name as
+        PostService.create_post() and ProjectService.create_project().
+
+        @param user: Current user (must be publisher)
+        @param title: Document title
+        @param description: Document description
+        @param category: Document category
+        @param file: Flask FileStorage object (the uploaded file)
+        @param published_date: Publication date string (YYYY-MM-DD)
+        @return: (document_dict, error)
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can upload documents."
+
+        if not title or not title.strip():
+            return None, "Title is required."
+
+        if category not in self.VALID_CATEGORIES:
+            category = 'General'
+
+        # Validate and save file
+        filename, error = self._validate_file(file)
+        if error:
+            return None, error
+
+        # Get file size
+        import os
+        file.seek(0, os.SEEK_END)
+        file_size_bytes = file.tell()
+        file.seek(0)  # Reset for saving
+
+        # Format file size for display
+        if file_size_bytes < 1024:
+            file_size = f"{file_size_bytes} B"
+        elif file_size_bytes < 1024 * 1024:
+            file_size = f"{file_size_bytes / 1024:.1f} KB"
+        else:
+            file_size = f"{file_size_bytes / (1024 * 1024):.1f} MB"
+
+        # Save file to disk
+        file_url = self._save_file(file, filename)
+
+        # Use today's date if none provided
+        if not published_date:
+            from datetime import date
+            published_date = date.today().isoformat()
+
+        # Create database record
+        doc = self._repo.create(
+            title=title.strip(),
+            description=description.strip(),
+            category=category,
+            file_url=file_url,
+            file_size=file_size,
+            published_date=published_date,
+            publisher_id=user.id
+        )
+        return (doc, None) if doc else (None, "Failed to save document.")
+
+    def delete_document(self, user, document_id):
+        """
+        Delete a transparency document. ONLY publisher can delete.
+
+        Also removes the file from disk to free up storage.
+
+        @param user: Current user (must be publisher)
+        @param document_id: ID of the document to delete
+        @return: (success: bool, error)
+        """
+        import os
+
+        if not user.can_publish():
+            return False, "Only the Barangay Captain can delete documents."
+
+        # Get the document to find its file path
+        doc = self._repo.get_by_id(document_id)
+        if not doc:
+            return False, "Document not found."
+
+        # Delete the file from disk
+        file_url = doc.get('file_url', '')
+        if file_url and file_url != '#':
+            # Convert relative URL (e.g., /static/uploads/report.pdf)
+            # to absolute filesystem path
+            # __file__ is service.py → dirname is the project root
+            project_root = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(project_root, file_url.lstrip('/'))
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+            except OSError:
+                pass  # File already gone or permission issue — not critical
+
+        # Delete from database
+        self._repo.delete(document_id, user.id)
+        return True, None
