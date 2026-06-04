@@ -30,6 +30,9 @@ Before you begin, ensure you have the following installed:
 1. In VS Code, open a new terminal (`Ctrl` + `` ` ``).
 2. Create the virtual environment by running:
    ```
+      python -m venv venv
+   ```
+
 3. Activate the environment:
    ```bash
    # Windows:
@@ -77,12 +80,6 @@ GovKonek-Flask-Project/
 ├── repository.py       # Database layer with BaseRepository (ABSTRACTION)
 ├── routes.py           # Flask HTTP routes (thin controllers)
 ├── service.py          # Business logic layer (Auth, Post, Voice, Project services)
-├── tests/              # Unit & integration tests
-│   ├── test_models.py
-│   ├── test_repository.py
-│   ├── test_config.py
-│   ├── test_exceptions.py
-│   └── test_integration.py
-├── templates/          # Jinja2 HTML templates
+├── templates/          # HTML templates
 └── static/             # CSS, JS, images
 ```
