@@ -449,17 +449,34 @@ class ProjectRepository(BaseRepository):
     """
 
     def get_all(self):
+        """
+        Fetch all projects, newest first.
+
+        @return: List of project dicts ordered by created_at DESC
+        """
         return [dict(p) for p in self._execute(
             'SELECT * FROM projects ORDER BY created_at DESC', fetch='all'
         )]
 
     def get_by_status(self, status):
+        """
+        Fetch projects filtered by status.
+
+        @param status: One of 'ongoing', 'completed', or 'planned'
+        @return: List of project dicts matching the given status
+        """
         return [dict(p) for p in self._execute(
             'SELECT * FROM projects WHERE status = ? ORDER BY created_at DESC',
             (status,), fetch='all'
         )]
 
     def get_by_id(self, project_id):
+        """
+        Fetch a single project by its ID.
+
+        @param project_id: Project's primary key
+        @return: Project dict or None if not found
+        """
         project = self._execute(
             'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'
         )
@@ -475,7 +492,22 @@ class ProjectRepository(BaseRepository):
     def create(self, title, description, status='ongoing', budget=0,
                location='', image_url='', start_date='', end_date='', publisher_id=None,
                latitude=None, longitude=None):
-        """Create a new project. Returns the created project as a dict."""
+        """
+        Create a new barangay project.
+
+        @param title: Project name
+        @param description: Detailed project description
+        @param status: One of 'ongoing', 'completed', 'planned'
+        @param budget: Project budget in PHP (or any currency)
+        @param location: Physical location or address of the project
+        @param image_url: Relative URL of the project's image
+        @param start_date: Start date string (YYYY-MM-DD format)
+        @param end_date: Expected completion date (YYYY-MM-DD format)
+        @param publisher_id: The user ID of the barangay captain who created it
+        @param latitude: GPS latitude for map marker placement
+        @param longitude: GPS longitude for map marker placement
+        @return: Created project dict or None on failure
+        """
         cursor = self._execute_write(
             '''INSERT INTO projects
                (title, description, status, budget, location, image_url, start_date, end_date, publisher_id, latitude, longitude)
@@ -490,7 +522,26 @@ class ProjectRepository(BaseRepository):
     def update(self, project_id, publisher_id, title, description, status,
                budget, location, image_url, start_date, end_date,
                latitude=None, longitude=None):
-        """Update a project. Only the owning publisher can update. Returns updated project or None."""
+        """
+        Update a project's details. Only the owning publisher can update.
+
+        The WHERE clause (id = ? AND publisher_id = ?) acts as an ownership
+        gate — if the publisher_id doesn't match, no rows are affected.
+
+        @param project_id: Project's primary key
+        @param publisher_id: Publisher's user ID for authorization
+        @param title: Updated title
+        @param description: Updated description
+        @param status: Updated status ('ongoing', 'completed', 'planned')
+        @param budget: Updated budget amount
+        @param location: Updated location string
+        @param image_url: Updated image URL
+        @param start_date: Updated start date (YYYY-MM-DD)
+        @param end_date: Updated end date (YYYY-MM-DD)
+        @param latitude: Updated GPS latitude
+        @param longitude: Updated GPS longitude
+        @return: Updated project dict or None if not found/authorized
+        """
         self._execute_write(
             '''UPDATE projects
                SET title = ?, description = ?, status = ?, budget = ?,
@@ -506,7 +557,15 @@ class ProjectRepository(BaseRepository):
         return dict(project) if project else None
 
     def delete(self, project_id, publisher_id):
-        """Delete a project. Only the owning publisher can delete."""
+        """
+        Delete a project. Only the owning publisher can delete.
+
+        The WHERE clause (id = ? AND publisher_id = ?) enforces ownership.
+
+        @param project_id: Project's primary key
+        @param publisher_id: Publisher's user ID for authorization
+        @return: True (operation is idempotent)
+        """
         self._execute_write(
             'DELETE FROM projects WHERE id = ? AND publisher_id = ?',
             (project_id, publisher_id)
@@ -526,18 +585,34 @@ class ServiceRepository(BaseRepository):
     """
 
     def get_all(self):
+        """
+        Fetch all active e-services, grouped by category then name.
+
+        @return: List of service dicts (only active services)
+        """
         return [dict(s) for s in self._execute(
             'SELECT * FROM services WHERE is_active = 1 ORDER BY category, name',
             fetch='all'
         )]
 
     def get_by_category(self, category):
+        """
+        Fetch active e-services filtered by category.
+
+        @param category: Category name (e.g., 'Certification', 'Permit')
+        @return: List of service dicts in the given category
+        """
         return [dict(s) for s in self._execute(
             'SELECT * FROM services WHERE category = ? AND is_active = 1 ORDER BY name',
             (category,), fetch='all'
         )]
 
     def get_categories(self):
+        """
+        Get distinct service category names.
+
+        @return: List of category strings, alphabetically sorted
+        """
         return [c['category'] for c in self._execute(
             'SELECT DISTINCT category FROM services WHERE is_active = 1 ORDER BY category',
             fetch='all'
@@ -556,17 +631,33 @@ class DocumentRepository(BaseRepository):
     """
 
     def get_all(self):
+        """
+        Fetch all transparency documents, newest first.
+
+        @return: List of document dicts ordered by published_date DESC
+        """
         return [dict(d) for d in self._execute(
             'SELECT * FROM documents ORDER BY published_date DESC', fetch='all'
         )]
 
     def get_by_category(self, category):
+        """
+        Fetch documents filtered by category.
+
+        @param category: Category name (e.g., 'Budget Report', 'Audit Report')
+        @return: List of document dicts in the given category
+        """
         return [dict(d) for d in self._execute(
             'SELECT * FROM documents WHERE category = ? ORDER BY published_date DESC',
             (category,), fetch='all'
         )]
 
     def get_categories(self):
+        """
+        Get distinct document category names.
+
+        @return: List of category strings, alphabetically sorted
+        """
         return [c['category'] for c in self._execute(
             'SELECT DISTINCT category FROM documents ORDER BY category', fetch='all'
         )]
@@ -575,7 +666,18 @@ class DocumentRepository(BaseRepository):
 
     def create(self, title, description, category, file_url, file_size,
                published_date, publisher_id):
-        """Create a new transparency document. Returns the created document as a dict."""
+        """
+        Create a new transparency document record.
+
+        @param title: Document title (e.g., 'Q1 2026 Budget Report')
+        @param description: Brief description of the document
+        @param category: Document category (Budget Report, Audit Report, etc.)
+        @param file_url: Relative URL path to the uploaded file
+        @param file_size: Human-readable file size (e.g., '2.4 MB')
+        @param published_date: Publication date (YYYY-MM-DD)
+        @param publisher_id: Publisher's user ID (reserved for future ownership tracking)
+        @return: Created document dict or None on failure
+        """
         cursor = self._execute_write(
             '''INSERT INTO documents
                (title, description, category, file_url, file_size, published_date)
@@ -588,7 +690,12 @@ class DocumentRepository(BaseRepository):
         return dict(doc) if doc else None
 
     def get_by_id(self, document_id):
-        """Fetch a single document by ID."""
+        """
+        Fetch a single document by its ID.
+
+        @param document_id: Document's primary key
+        @return: Document dict or None if not found
+        """
         doc = self._execute(
             'SELECT * FROM documents WHERE id = ?', (document_id,), fetch='one'
         )
@@ -596,11 +703,15 @@ class DocumentRepository(BaseRepository):
 
     def delete(self, document_id, publisher_id):
         """
-        Delete a transparency document.
+        Delete a transparency document record from the database.
+
+        Note: This only removes the database record. The caller
+        (DocumentService) is responsible for deleting the file from disk.
 
         @param document_id: ID of the document to delete
         @param publisher_id: Publisher's user ID (for authorization — kept for
                              future per-publisher ownership tracking)
+        @return: True
         """
         self._execute_write(
             'DELETE FROM documents WHERE id = ?', (document_id,)
@@ -674,7 +785,15 @@ class VoiceRepository(BaseRepository):
         return dict(post) if post else None
 
     def create(self, user_id, title, content, category='General'):
-        """Create a new voice post. Returns the created post as a dict."""
+        """
+        Create a new Citizens' Voice post.
+
+        @param user_id: The author's user ID
+        @param title: Post title
+        @param content: Post body text
+        @param category: Category (General, Grievance, Suggestion, Question, Announcement)
+        @return: Created post dict with author info or None on failure
+        """
         cursor = self._execute_write(
             'INSERT INTO voice_posts (user_id, title, content, category) VALUES (?, ?, ?, ?)',
             (user_id, title, content, category)
@@ -688,7 +807,13 @@ class VoiceRepository(BaseRepository):
         return dict(post) if post else None
 
     def update_status(self, voice_post_id, status):
-        """Update the status of a voice post (open/resolved/closed)."""
+        """
+        Update the status of a voice post.
+
+        @param voice_post_id: Voice post's primary key
+        @param status: New status — 'open', 'resolved', or 'closed'
+        @return: True
+        """
         self._execute_write(
             'UPDATE voice_posts SET status = ? WHERE id = ?',
             (status, voice_post_id)
@@ -696,7 +821,15 @@ class VoiceRepository(BaseRepository):
         return True
 
     def delete(self, voice_post_id, user_id):
-        """Delete a voice post. Only the author can delete."""
+        """
+        Delete a voice post. Only the original author can delete.
+
+        The WHERE clause (id = ? AND user_id = ?) enforces authorship.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Author's user ID for authorization
+        @return: True
+        """
         self._execute_write(
             'DELETE FROM voice_posts WHERE id = ? AND user_id = ?',
             (voice_post_id, user_id)
@@ -704,7 +837,11 @@ class VoiceRepository(BaseRepository):
         return True
 
     def get_categories(self):
-        """Get distinct categories used in voice posts."""
+        """
+        Get distinct categories used across all voice posts.
+
+        @return: List of category strings, alphabetically sorted
+        """
         return [c['category'] for c in self._execute(
             'SELECT DISTINCT category FROM voice_posts ORDER BY category', fetch='all'
         )]
@@ -712,7 +849,15 @@ class VoiceRepository(BaseRepository):
     # -- voice comments --------------------------------------------------
 
     def get_comments(self, voice_post_id):
-        """Fetch all comments for a voice post with author info."""
+        """
+        Fetch all comments for a voice post, with author info.
+
+        Comments are ordered oldest-first (ASC) to show conversation
+        in chronological order.
+
+        @param voice_post_id: Voice post's primary key
+        @return: List of comment dicts with author_name and author_role
+        """
         return [dict(c) for c in self._execute('''
             SELECT vc.*, u.username as author_name, u.role as author_role
             FROM voice_comments vc
@@ -722,7 +867,15 @@ class VoiceRepository(BaseRepository):
         ''', (voice_post_id,), fetch='all')]
 
     def add_comment(self, voice_post_id, user_id, content, is_official=False):
-        """Add a comment to a voice post. Returns the new comment as a dict."""
+        """
+        Add a comment to a voice post.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Comment author's user ID
+        @param content: Comment text
+        @param is_official: True if the commenter is a barangay captain
+        @return: Created comment dict with author info or None on failure
+        """
         cursor = self._execute_write(
             'INSERT INTO voice_comments (voice_post_id, user_id, content, is_official) VALUES (?, ?, ?, ?)',
             (voice_post_id, user_id, content, 1 if is_official else 0)
@@ -738,7 +891,13 @@ class VoiceRepository(BaseRepository):
     # -- voice votes -----------------------------------------------------
 
     def get_user_vote(self, voice_post_id, user_id):
-        """Get the vote type a user cast on a voice post, or None."""
+        """
+        Get the vote a specific user cast on a voice post.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: User's ID
+        @return: 'up', 'down', or None if the user hasn't voted
+        """
         vote = self._execute(
             'SELECT vote_type FROM voice_votes WHERE voice_post_id = ? AND user_id = ?',
             (voice_post_id, user_id), fetch='one'
@@ -809,27 +968,47 @@ class BarangayRepository(BaseRepository):
     """
 
     def get_all(self):
-        """Fetch all barangays, newest first."""
+        """
+        Fetch all barangays, newest first.
+
+        @return: List of barangay dicts ordered by created_at DESC
+        """
         return [dict(b) for b in self._execute(
             'SELECT * FROM barangays ORDER BY created_at DESC', fetch='all'
         )]
 
     def get_by_id(self, barangay_id):
-        """Fetch a single barangay by ID."""
+        """
+        Fetch a single barangay by its ID.
+
+        @param barangay_id: Barangay's primary key
+        @return: Barangay dict or None if not found
+        """
         row = self._execute(
             'SELECT * FROM barangays WHERE id = ?', (barangay_id,), fetch='one'
         )
         return dict(row) if row else None
 
     def get_by_publisher(self, publisher_id):
-        """Fetch the barangay managed by a specific publisher."""
+        """
+        Fetch the barangay managed by a specific publisher.
+
+        Each publisher can manage at most ONE barangay.
+
+        @param publisher_id: Publisher's user ID
+        @return: Barangay dict or None if the publisher has no barangay
+        """
         row = self._execute(
             'SELECT * FROM barangays WHERE publisher_id = ?', (publisher_id,), fetch='one'
         )
         return dict(row) if row else None
 
     def get_first(self):
-        """Fetch the first/default barangay (used for the generic landing page)."""
+        """
+        Fetch the first/default barangay (used as fallback for generic landing page).
+
+        @return: Barangay dict or None if no barangays exist
+        """
         row = self._execute(
             'SELECT * FROM barangays ORDER BY id ASC LIMIT 1', fetch='one'
         )
@@ -839,7 +1018,23 @@ class BarangayRepository(BaseRepository):
                facebook='', office_hours_weekday='8:00 AM – 5:00 PM',
                office_hours_saturday='8:00 AM – 12:00 PM', motto='',
                latitude=14.71309, longitude=121.10063, publisher_id=None):
-        """Create a new barangay. Returns the created barangay as a dict."""
+        """
+        Create a new barangay landing page.
+
+        @param name: Barangay name (required)
+        @param description: Brief description of the barangay
+        @param address: Full physical address
+        @param phone: Contact phone number
+        @param email: Official email address
+        @param facebook: Facebook page URL or handle
+        @param office_hours_weekday: Weekday office hours display string
+        @param office_hours_saturday: Saturday office hours display string
+        @param motto: Barangay motto/tagline
+        @param latitude: GPS latitude for map pin
+        @param longitude: GPS longitude for map pin
+        @param publisher_id: User ID of the managing barangay captain
+        @return: Created barangay dict or None on failure
+        """
         cursor = self._execute_write(
             '''INSERT INTO barangays
                (name, description, address, phone, email, facebook,
@@ -881,7 +1076,15 @@ class BarangayRepository(BaseRepository):
         return self.get_by_id(barangay_id)
 
     def delete(self, barangay_id, publisher_id):
-        """Delete a barangay. Only the owning publisher can delete."""
+        """
+        Delete a barangay. Only the owning publisher can delete.
+
+        The WHERE clause (id = ? AND publisher_id = ?) enforces ownership.
+
+        @param barangay_id: Barangay's primary key
+        @param publisher_id: Publisher's user ID for authorization
+        @return: True
+        """
         self._execute_write(
             'DELETE FROM barangays WHERE id = ? AND publisher_id = ?',
             (barangay_id, publisher_id)
@@ -889,65 +1092,4 @@ class BarangayRepository(BaseRepository):
         return True
 
 
-# ===========================================================================
-# OfficialRepository — Barangay officials management
-# ===========================================================================
 
-class OfficialRepository(BaseRepository):
-    """
-    Repository for barangay officials (captain, kagawads, secretary, etc.).
-
-    INHERITANCE: Extends BaseRepository.
-    """
-
-    def get_by_barangay(self, barangay_id):
-        """Fetch all officials for a barangay, ordered by rank."""
-        return [dict(o) for o in self._execute(
-            'SELECT * FROM officials WHERE barangay_id = ? ORDER BY rank_order ASC',
-            (barangay_id,), fetch='all'
-        )]
-
-    def get_by_id(self, official_id):
-        """Fetch a single official by ID."""
-        row = self._execute(
-            'SELECT * FROM officials WHERE id = ?', (official_id,), fetch='one'
-        )
-        return dict(row) if row else None
-
-    def create(self, barangay_id, name, position, rank_order=0):
-        """Add a new official to a barangay. Returns the created official."""
-        cursor = self._execute_write(
-            'INSERT INTO officials (barangay_id, name, position, rank_order) VALUES (?, ?, ?, ?)',
-            (barangay_id, name, position, rank_order)
-        )
-        return self.get_by_id(cursor.lastrowid)
-
-    def update(self, official_id, **fields):
-        """Update an official's info."""
-        allowed = ['name', 'position', 'rank_order']
-        set_clauses = []
-        params = []
-        for key in allowed:
-            if key in fields:
-                set_clauses.append(f'{key} = ?')
-                params.append(fields[key])
-        if not set_clauses:
-            return self.get_by_id(official_id)
-        params.append(official_id)
-        self._execute_write(
-            f"UPDATE officials SET {', '.join(set_clauses)} WHERE id = ?",
-            tuple(params)
-        )
-        return self.get_by_id(official_id)
-
-    def delete(self, official_id):
-        """Remove an official."""
-        self._execute_write('DELETE FROM officials WHERE id = ?', (official_id,))
-        return True
-
-    def delete_all_for_barangay(self, barangay_id):
-        """Remove all officials for a barangay (useful for bulk replace)."""
-        self._execute_write(
-            'DELETE FROM officials WHERE barangay_id = ?', (barangay_id,)
-        )
-        return True

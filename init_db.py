@@ -1,11 +1,53 @@
+"""
+GovKonek Database Initialization Script
+
+Run this script once to create all required SQLite tables and seed default data.
+This is a standalone utility — it's NOT imported by the Flask app at runtime.
+
+Usage:
+    python init_db.py          # Creates/resets govkonek.db with all tables
+
+Database Schema:
+    - users:              Citizen and publisher accounts
+    - posts:              Barangay announcements with category support
+    - comments:           Nested comments on posts
+    - reactions:          Emoji reactions (one per user per post)
+    - projects:           Barangay infrastructure projects with lat/lng
+    - services:           E-services catalog
+    - documents:          Transparency documents (budget reports, ordinances, etc.)
+    - voice_posts:        Citizens' Voice forum topics
+    - voice_comments:     Comments on voice posts (publisher = official response)
+    - voice_votes:        Up/down votes on voice posts
+    - barangays:          Configurable barangay landing-page content
+
+Migration Strategy:
+    Uses IF NOT EXISTS for CREATE TABLE and try/except for ALTER TABLE,
+    so this script is safe to run repeatedly — it adds missing columns
+    without destroying existing data.
+"""
+
 import sqlite3
 
+
 def create_database():
+    """
+    Create all database tables and seed default data.
+
+    This function is idempotent — running it multiple times will not
+    duplicate tables or seed rows.
+    """
+    # Open (or create) the SQLite database file
     connection = sqlite3.connect('govkonek.db')
-    connection.row_factory = sqlite3.Row
+    connection.row_factory = sqlite3.Row  # Allows accessing columns by name
     cursor = connection.cursor()
 
+    # ===================================================================
+    # CORE TABLES
+    # ===================================================================
+
     # -- Users -----------------------------------------------------------
+    # Stores both citizen and publisher (barangay captain) accounts.
+    # The 'role' column is the discriminator: 'citizen' or 'publisher'.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -16,6 +58,9 @@ def create_database():
     ''')
 
     # -- Posts -----------------------------------------------------------
+    # Barangay announcements published by barangay captains.
+    # category supports: Announcement, Emergency, Health, Project.
+    # status can be: published, draft, archived.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,13 +74,22 @@ def create_database():
         )
     ''')
 
-    # -- Migration: add category column if it doesn't exist -------------
+    # ===================================================================
+    # MIGRATIONS — Safe ALTER TABLE operations
+    # ===================================================================
+    # Each migration is wrapped in try/except so the script is safe to
+    # run repeatedly. If a column already exists, sqlite3 raises
+    # OperationalError which we silently ignore.
+
+    # -- Migration: add category column to posts -------------------------
     try:
         cursor.execute("ALTER TABLE posts ADD COLUMN category TEXT DEFAULT 'Announcement'")
     except sqlite3.OperationalError:
         pass  # column already exists
 
     # -- Migration: user profile fields ----------------------------------
+    # email, address, phone_number, profile_picture were added after
+    # the initial users table was created.
     for col, col_def in [
         ('email', "TEXT DEFAULT ''"),
         ('address', "TEXT DEFAULT ''"),
@@ -48,18 +102,27 @@ def create_database():
             pass
 
     # -- Migration: post media support -----------------------------------
+    # Allows attaching an image to a post (stored as a file path).
     try:
         cursor.execute("ALTER TABLE posts ADD COLUMN image_path TEXT DEFAULT ''")
     except sqlite3.OperationalError:
         pass
 
     # -- Migration: nested comments (parent_id) --------------------------
+    # Enables threaded replies: a comment can reference another comment
+    # as its parent via parent_id.
     try:
         cursor.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id)")
     except sqlite3.OperationalError:
         pass
 
+# ===================================================================
+    # INTERACTION TABLES
+    # ===================================================================
+
     # -- Comments --------------------------------------------------------
+    # Stores user comments on announcement posts.
+    # parent_id (added via migration) enables threaded/nested replies.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,6 +136,9 @@ def create_database():
     ''')
 
     # -- Reactions -------------------------------------------------------
+    # Each user can react to a post with exactly ONE emoji at a time.
+    # The UNIQUE(post_id, user_id) constraint enforces one-reaction-per-user.
+    # Toggling: same emoji = remove, different emoji = change, none = add.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS reactions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,7 +152,13 @@ def create_database():
         )
     ''')
 
+    # ===================================================================
+    # FEATURE TABLES
+    # ===================================================================
+
     # -- Barangay Projects -----------------------------------------------
+    # Tracks infrastructure and community projects with geolocation.
+    # latitude/longitude (added via migrations) enable map markers.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -104,13 +176,15 @@ def create_database():
         )
     ''')
 
-    # -- Migration: add publisher_id column if it doesn't exist ----------
+    # -- Migration: add publisher_id for ownership tracking ----------------
     try:
         cursor.execute("ALTER TABLE projects ADD COLUMN publisher_id INTEGER REFERENCES users(id)")
     except sqlite3.OperationalError:
         pass  # column already exists
 
-    # -- Migration: add lat/lng columns for map markers -----------------
+    # -- Migration: add lat/lng columns for map markers ------------------
+    # Duplicated intentionally as a safety measure — sqlite3 silently
+    # ignores ALTER TABLE for existing columns.
     try:
         cursor.execute("ALTER TABLE projects ADD COLUMN latitude REAL")
     except sqlite3.OperationalError:
@@ -131,6 +205,8 @@ def create_database():
         pass
 
     # -- E-Services -----------------------------------------------------
+    # Catalog of available barangay e-services (request certificates,
+    # file complaints, etc.). is_active toggles service visibility.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS services (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,6 +221,9 @@ def create_database():
     ''')
 
     # -- Transparency Documents ------------------------------------------
+    # Stores budget reports, audit reports, ordinances, resolutions, etc.
+    # file_url is the relative path to the uploaded file.
+    # file_size is a human-readable string (e.g., "2.4 MB").
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS documents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,7 +237,14 @@ def create_database():
         )
     ''')
 
+    # ===================================================================
+    # CITIZENS' VOICE FORUM TABLES
+    # ===================================================================
+
     # -- Citizens' Voice Posts -------------------------------------------
+    # Community forum where any user can post topics, grievances,
+    # suggestions, or questions. status: open / resolved / closed.
+    # vote_count is a cached counter updated via triggers/application logic.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_posts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -174,6 +260,8 @@ def create_database():
     ''')
 
     # -- Citizens' Voice Comments ----------------------------------------
+    # is_official flag marks responses from barangay captains.
+    # These are highlighted differently in the UI.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,6 +276,9 @@ def create_database():
     ''')
 
     # -- Citizens' Voice Votes -------------------------------------------
+    # Each user gets ONE vote per voice post (up or down).
+    # The UNIQUE constraint prevents multiple votes.
+    # vote_type CHECK enforces only 'up' or 'down' values.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS voice_votes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -201,7 +292,14 @@ def create_database():
         )
     ''')
 
+# ===================================================================
+    # BARANGAY LANDING PAGE TABLES
+    # ===================================================================
+
     # -- Barangays (configurable landing page per barangay) ---------------
+    # Each barangay captain can create their own landing page with
+    # custom info: name, description, address, contact details,
+    # office hours, motto, and map coordinates.
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS barangays (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -223,7 +321,8 @@ def create_database():
         )
     ''')
 
-    # Seed a default barangay if none exists
+    # -- Seed: default barangay (Payatas, Quezon City) ------------------
+    # Creates a placeholder barangay so the landing page is never empty.
     cursor.execute('SELECT COUNT(*) FROM barangays')
     if cursor.fetchone()[0] == 0:
         cursor.execute('''
@@ -244,45 +343,19 @@ def create_database():
             121.10063
         ))
 
-    # -- Barangay Officials ------------------------------------------------
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS officials (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            barangay_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            position TEXT NOT NULL,
-            rank_order INTEGER DEFAULT 0,
-            image TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (barangay_id) REFERENCES barangays(id) ON DELETE CASCADE
-        )
-    ''')
-
-    # Seed default officials for the first barangay if none exist
-    cursor.execute('SELECT COUNT(*) FROM officials')
-    if cursor.fetchone()[0] == 0:
-        default_officials = [
-            ('Juan Dela Cruz', 'Punong Barangay (Barangay Captain)', 1),
-            ('Maria Santos', 'Barangay Kagawad (Councilor)', 2),
-            ('Jose Rizal', 'Barangay Kagawad (Councilor)', 3),
-            ('Ana Reyes', 'Barangay Kagawad (Councilor)', 4),
-            ('Pedro Gonzales', 'Barangay Kagawad (Councilor)', 5),
-            ('Sofia Mendoza', 'Barangay Kagawad (Councilor)', 6),
-            ('Luis Torres', 'Barangay Kagawad (Councilor)', 7),
-            ('Elena Cruz', 'Barangay Kagawad (Councilor)', 8),
-            ('Carlos Bautista', 'SK Chairperson', 9),
-            ('Teresa Villanueva', 'Barangay Secretary', 10),
-            ('Ramon Flores', 'Barangay Treasurer', 11),
-        ]
-        for name, position, rank in default_officials:
-            cursor.execute(
-                'INSERT INTO officials (barangay_id, name, position, rank_order) VALUES (1, ?, ?, ?)',
-                (name, position, rank)
-            )
-
+    # ===================================================================
+    # FINALIZE
+    # ===================================================================
+    # Commit all changes and close the connection.
     connection.commit()
     connection.close()
     print("Database and all tables created successfully!")
 
+
+# ===================================================================
+# ENTRY POINT
+# ===================================================================
 if __name__ == '__main__':
+    # Run this script directly to create/reset the database:
+    #   python init_db.py
     create_database()
