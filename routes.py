@@ -266,9 +266,25 @@ def create_routes(app):
     @login_required
     def e_services():
         """E-Services page."""
+        svc = _get_services()
+        services = svc['service_repo'].get_all()
+        # Group by category for template rendering
+        grouped = {}
+        for s in services:
+            cat = s.get('category', 'General')
+            if cat not in grouped:
+                grouped[cat] = []
+            # Pre-compute slug for href
+            s_slug = s.get('name', '').lower()
+            # Simple slug: replace non-alphanumeric runs with hyphens
+            import re
+            s_slug = re.sub(r'[^a-z0-9]+', '-', s_slug).strip('-')
+            s['slug'] = s_slug
+            grouped[cat].append(s)
         return render_template('services.html',
                                name=current_user.username,
-                               role=current_user.role)
+                               role=current_user.role,
+                               grouped_services=grouped)
 
     @app.route('/services/<service_name>')
     @login_required

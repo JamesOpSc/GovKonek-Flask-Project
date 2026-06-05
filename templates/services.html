@@ -129,57 +129,24 @@
 </div>
 
 <div id="servicesContainer">
-    <div class="loading-spinner"><div class="spinner"></div></div>
+    {% if grouped_services %}
+        {% for category, items in grouped_services.items() %}
+        <div class="category-section">
+            <div class="category-title">📂 {{ category }}</div>
+            <div class="service-grid">
+                {% for s in items %}
+                <a href="/services/{{ s.slug }}" class="service-card">
+                    <div class="service-icon">{{ s.icon or '📋' }}</div>
+                    <div class="service-name">{{ s.name }}</div>
+                    <div class="service-desc">{{ s.description }}</div>
+                    <span class="service-badge">🔗 View Details</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state">No services available at this time.</div>
+    {% endif %}
 </div>
-
-<script>
-(function() {
-    const container = document.getElementById('servicesContainer');
-
-    function escapeHtml(s) {
-        const d = document.createElement('div');
-        d.textContent = s || '';
-        return d.innerHTML;
-    }
-
-    fetch('/api/services')
-        .then(r => r.json())
-        .then(data => {
-            const services = data.services || [];
-            if (services.length === 0) {
-                container.innerHTML = '<div class="empty-state">No services available at this time.</div>';
-                return;
-            }
-            // Group by category
-            const grouped = {};
-            services.forEach(s => {
-                const cat = s.category || 'General';
-                if (!grouped[cat]) grouped[cat] = [];
-                grouped[cat].push(s);
-            });
-
-            let html = '';
-            for (const [cat, items] of Object.entries(grouped)) {
-                html += `<div class="category-section">
-                    <div class="category-title">📂 ${escapeHtml(cat)}</div>
-                    <div class="service-grid">
-                        ${items.map(s => `
-                            <a href="/services/${encodeURIComponent(s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/,''))}"
-                               class="service-card">
-                                <div class="service-icon">${s.icon || '📋'}</div>
-                                <div class="service-name">${escapeHtml(s.name)}</div>
-                                <div class="service-desc">${escapeHtml(s.description)}</div>
-                                <span class="service-badge">🔗 View Details</span>
-                            </a>
-                        `).join('')}
-                    </div>
-                </div>`;
-            }
-            container.innerHTML = html;
-        })
-        .catch(() => {
-            container.innerHTML = '<div class="empty-state">Failed to load services. Please try again.</div>';
-        });
-})();
-</script>
 {% endblock %}
