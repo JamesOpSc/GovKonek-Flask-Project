@@ -151,9 +151,20 @@
 
     // Barangay Hall marker (always shown)
     L.marker([centerLat, centerLng], { icon: makeIcon('#0056b3') })
-        .addTo(map)
-        .bindPopup('<strong>🏛️ Barangay Hall</strong><br><span style="font-size:13px;color:#475569;">Main administrative building.</span>');
-
+    .addTo(map)
+    .bindPopup(`
+        <strong>
+            🏛️ 
+            <a href="/barangay-landing" style="color:#0056b3;text-decoration:underline;">
+                Barangay Hall
+            </a>
+        </strong>
+        <br>
+        <span style="font-size:13px;color:#475569;">
+            Main administrative building. Click title to view details.
+        </span>
+    `);
+    
     // Fetch projects and place markers
     fetch('/api/projects')
         .then(r => r.json())
