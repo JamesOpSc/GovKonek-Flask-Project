@@ -60,11 +60,11 @@
         <h3 style="font-size: 18px; margin-bottom: 15px;">📌 Your Active Requests</h3>
         
         <ul class="tracker-list">
-            <li class="tracker-item">
+            <li class="tracker-item" onclick="window.location.href='/services/barangay-clearance'">
                 <span>Brgy. Clearance</span>
                 <span class="req-badge req-process">Processing</span>
             </li>
-            <li class="tracker-item">
+            <li class="tracker-item" onclick="window.location.href='/citizens-voice'">
                 <span>Noise Complaint #104</span>
                 <span class="req-badge req-process">Reviewing</span>
             </li>
@@ -74,8 +74,8 @@
     <div class="card">
         <h3 style="font-size: 18px; margin-bottom: 15px;">⚡ Quick Actions</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-            <button class="btn" style="width: 100%; font-size: 13px;">Request Document</button>
-            <button class="btn" style="width: 100%; font-size: 13px; background: white; color: #1f2937; border: 1px solid #e2e8f0;">Report Grievance</button>
+            <a href="/services" class="btn" style="width: 100%; font-size: 13px; text-decoration: none;">Request Document</a>
+            <a href="/citizens-voice" class="btn" style="width: 100%; font-size: 13px; background: white; color: #1f2937; border: 1px solid #e2e8f0; text-decoration: none;">Report Grievance</a>
         </div>
     </div>
 

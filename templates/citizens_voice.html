@@ -309,16 +309,21 @@
 </div>
 
 <!-- ================================================================= -->
-<!-- FILTERS                                                           -->
+<!-- SEARCH + SORT BAR                                                 -->
 <!-- ================================================================= -->
-<div class="voice-filters">
-    <span style="font-weight:700;font-size:13px;color:#64748b;margin-right:4px;">Category:</span>
-    <span class="voice-pill active" data-category="" onclick="filterCategory('')">All</span>
-    <span class="voice-pill" data-category="Grievance" onclick="filterCategory('Grievance')">😠 Grievance</span>
-    <span class="voice-pill" data-category="Suggestion" onclick="filterCategory('Suggestion')">💡 Suggestion</span>
-    <span class="voice-pill" data-category="Question" onclick="filterCategory('Question')">❓ Question</span>
-    <span class="voice-pill" data-category="Announcement" onclick="filterCategory('Announcement')">📢 Announcement</span>
-    <span class="voice-pill" data-category="General" onclick="filterCategory('General')">💬 General</span>
+<div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;">
+    <input type="text" id="searchInput" class="comment-input"
+           placeholder="🔍 Search by title or username..."
+           style="flex:3;padding:11px 16px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;"
+           oninput="debounceSearch()">
+    <select id="sortSelect" class="comment-input"
+            style="flex:1;padding:11px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;font-weight:600;color:#475569;cursor:pointer;background:white;min-width:150px;"
+            onchange="debounceSearch()">
+        <option value="newest">🕐 Newest First</option>
+        <option value="oldest">📅 Oldest First</option>
+        <option value="most_voted">👍 Most Voted</option>
+        <option value="most_commented">💬 Most Discussed</option>
+    </select>
 </div>
 
 <!-- ================================================================= -->
@@ -374,9 +379,9 @@
     // =====================================================================
     // STATE
     // =====================================================================
-    let currentCategory = '';
     let selectedPostId = null;
     let allPosts = [];
+    let searchTimeout = null;
 
     // =====================================================================
     // INIT
@@ -384,6 +389,14 @@
     document.addEventListener('DOMContentLoaded', () => {
         loadPosts();
     });
+
+    // =====================================================================
+    // SEARCH (with debounce)
+    // =====================================================================
+    function debounceSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => loadPosts(), 300);
+    }
 
     // =====================================================================
     // LOAD POSTS
@@ -395,8 +408,13 @@
         empty.style.display = 'none';
 
         try {
-            let url = '/api/voice';
-            if (currentCategory) url += `?category=${encodeURIComponent(currentCategory)}`;
+            const search = document.getElementById('searchInput').value.trim();
+            const sort = document.getElementById('sortSelect').value;
+            const params = new URLSearchParams();
+            if (search) params.set('search', search);
+            if (sort && sort !== 'newest') params.set('sort', sort);
+            const qs = params.toString();
+            const url = '/api/voice' + (qs ? '?' + qs : '');
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to load posts');
             const data = await resp.json();
@@ -657,24 +675,6 @@
     document.addEventListener('click', function(e) {
         if (e.target.id === 'newPostModal') closeNewPostModal();
     });
-
-    // =====================================================================
-    // FILTER
-    // =====================================================================
-    function filterCategory(category) {
-        currentCategory = category;
-        document.querySelectorAll('.voice-pill').forEach(p => {
-            p.classList.toggle('active', p.getAttribute('data-category') === category);
-        });
-        selectedPostId = null;
-        document.getElementById('voiceDetail').innerHTML = `
-            <div class="voice-detail-empty">
-                <div class="icon">💬</div>
-                <p style="font-weight:600;font-size:15px;">Select a post to view</p>
-                <p style="font-size:13px;margin-top:4px;">Click on any topic from the list</p>
-            </div>`;
-        loadPosts();
-    }
 
     // =====================================================================
     // HELPERS

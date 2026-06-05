@@ -211,9 +211,10 @@ class VoiceService:
 
     # -- voice posts -----------------------------------------------------
 
-    def get_posts(self, category=None, status=None):
-        """Get all voice posts, optionally filtered."""
-        return self._repo.get_all(category=category, status=status)
+    def get_posts(self, category=None, status=None, search=None, sort=None):
+        """Get all voice posts, optionally filtered by category, status, title/author search, and sorted."""
+        return self._repo.get_all(category=category, status=status,
+                                  search=search, sort=sort)
 
     def get_post_detail(self, voice_post_id, user_id=None):
         """Get a voice post with comments and user's vote."""

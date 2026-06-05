@@ -571,11 +571,22 @@ def create_routes(app):
     @app.route('/api/voice')
     @login_required
     def api_get_voice_posts():
-        """API: Get all voice posts, optionally filtered."""
+        """
+        API: Get all voice posts, optionally filtered and sorted.
+
+        Query params:
+          - search:   Search in BOTH post titles AND author usernames (case-insensitive)
+          - sort:     Sort order — 'newest' (default), 'oldest', 'most_voted', 'most_commented'
+          - category: Filter by category (Grievance, Suggestion, etc.)
+          - status:   Filter by status (open, resolved, closed)
+        """
         category = request.args.get('category')
         status = request.args.get('status')
+        search = request.args.get('search')
+        sort = request.args.get('sort', 'newest')
         svc = _get_services()
-        posts = svc['voice'].get_posts(category=category, status=status)
+        posts = svc['voice'].get_posts(category=category, status=status,
+                                        search=search, sort=sort)
         return jsonify({'posts': posts})
 
     @app.route('/api/voice/<int:post_id>')

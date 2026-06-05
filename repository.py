@@ -601,8 +601,16 @@ class VoiceRepository(BaseRepository):
 
     # -- voice posts CRUD ------------------------------------------------
 
-    def get_all(self, category=None, status=None):
-        """Fetch all voice posts with author names, newest first. Optional filters."""
+    def get_all(self, category=None, status=None, search=None, sort='newest'):
+        """
+        Fetch all voice posts with author names, newest first. Optional filters.
+
+        @param category: Filter by post category (e.g. 'Grievance', 'Suggestion')
+        @param status: Filter by post status ('open', 'resolved', 'closed')
+        @param search: Search in BOTH title AND author username (case-insensitive LIKE)
+        @param sort: Sort order — 'newest' (default), 'oldest', 'most_voted', 'most_commented'
+        @return: List of dicts
+        """
         query = '''
             SELECT vp.*, u.username as author_name, u.role as author_role,
                    (SELECT COUNT(*) FROM voice_comments vc WHERE vc.voice_post_id = vp.id) as comment_count
@@ -617,7 +625,21 @@ class VoiceRepository(BaseRepository):
         if status:
             query += ' AND vp.status = ?'
             params.append(status)
-        query += ' ORDER BY vp.created_at DESC'
+        if search and search.strip():
+            query += ' AND (vp.title LIKE ? OR u.username LIKE ?)'
+            like_val = f'%{search.strip()}%'
+            params.extend([like_val, like_val])
+
+        # Sort options
+        sort_map = {
+            'newest':         'vp.created_at DESC',
+            'oldest':         'vp.created_at ASC',
+            'most_voted':     'vp.vote_count DESC, vp.created_at DESC',
+            'most_commented': 'comment_count DESC, vp.created_at DESC',
+        }
+        order_clause = sort_map.get(sort, 'vp.created_at DESC')
+        query += f' ORDER BY {order_clause}'
+
         return [dict(p) for p in self._execute(query, tuple(params), fetch='all')]
 
     def get_by_id(self, voice_post_id):
