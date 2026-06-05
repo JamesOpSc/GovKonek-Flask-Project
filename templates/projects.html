@@ -79,7 +79,31 @@
     .status-completed { background: #dcfce7; color: #166534; }
     .status-planned { background: #dbeafe; color: #1e40af; }
     .project-title { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
-    .project-desc { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 14px; }
+    .project-desc {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.6;
+    margin-bottom: 14px;
+    text-align: justify;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    }
+
+    .read-more-btn {
+    color: #0f766e;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 12px;
+    margin-top: 6px;
+    display: inline-block;
+    border: none;
+    background: none;
+    padding: 0;
+    }
+
+    .read-more-btn:hover {
+    text-decoration: underline;
+    }
     .project-meta {
         display: flex;
         gap: 16px;
@@ -318,6 +342,29 @@
         return '₱' + (n || 0).toLocaleString('en-PH');
     }
 
+    function renderDescription(description) {
+    const text = description || '';
+    const limit = 50;
+
+    if (text.length <= limit) {
+        return `<p class="project-desc">${escapeHtml(text)}</p>`;
+    }
+
+    const shortText = escapeHtml(text.substring(0, limit));
+
+    return `
+        <p class="project-desc">
+            <span class="short-desc">${shortText}...</span>
+            <span class="full-desc" style="display:none;">
+                ${escapeHtml(text)}
+            </span>
+            <br>
+            <button class="read-more-btn" onclick="toggleDescription(this)">
+                Read More
+            </button>
+        </p>
+    `;
+    }
     function renderProject(p) {
         const statusClass = 'status-' + (p.status || 'planned');
         const imgHtml = p.image_url
@@ -342,7 +389,7 @@
             <div class="project-body">
                 <span class="project-status ${statusClass}">${p.status}</span>
                 <h4 class="project-title">${escapeHtml(p.title)}</h4>
-                <p class="project-desc">${escapeHtml(p.description)}</p>
+                ${renderDescription(p.description)}
                 <div class="project-meta">
                     <span>📍 ${escapeHtml(p.location || 'Barangay-wide')}</span>
                     <span class="budget">💰 ${formatCurrency(p.budget)}</span>
@@ -375,7 +422,22 @@
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
+    
+    window.toggleDescription = function(button) {
+    const container = button.parentElement;
+    const shortDesc = container.querySelector('.short-desc');
+    const fullDesc = container.querySelector('.full-desc');
 
+    if (fullDesc.style.display === 'none') {
+        shortDesc.style.display = 'none';
+        fullDesc.style.display = 'inline';
+        button.textContent = 'Read Less';
+    } else {
+        shortDesc.style.display = 'inline';
+        fullDesc.style.display = 'none';
+        button.textContent = 'Read More';
+    }
+    };
     // ====== Load projects ======
     function loadProjects() {
         fetch('/api/projects')
