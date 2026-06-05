@@ -9,12 +9,10 @@ REFACTORED for testability:
     - Routes access services via current_app.extensions (dependency injection).
     - No direct imports of concrete AuthService / PostService.
     - In tests, inject mock services into app.extensions before calling routes.
-    - FileUploadHelper encapsulates file-system operations (ABSTRACTION).
 """
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
-from file_upload import get_upload_helper
 
 
 def _get_services():
@@ -37,7 +35,6 @@ def _get_services():
         'voice_repo': ext['voice_repo'],
         'barangay_repo': ext['barangay_repo'],
         'barangay_service': ext['barangay_service'],
-        'official_repo': ext['official_repo'],
     }
 
 
@@ -82,6 +79,12 @@ def create_routes(app):
 
             if success:
                 login_user(user)
+
+                # Redirect publishers to their barangay landing page
+                if user.role == 'publisher':
+                    return redirect(url_for('barangay_landing'))
+
+                # All other users go to dashboard
                 return redirect(url_for('dashboard'))
             else:
                 flash('Invalid username or password.', 'error')
@@ -206,15 +209,21 @@ def create_routes(app):
             content = data.get('content', '') if data else ''
             category = data.get('category', 'Announcement') if data else 'Announcement'
 
-        # Handle image upload via FileUploadHelper (ABSTRACTION)
+        # Handle image upload
         image_path = ''
         uploaded_image = request.files.get('image') if request.files else None
         if uploaded_image and uploaded_image.filename:
-            try:
-                helper = get_upload_helper()
-                image_path = helper.save(uploaded_image, prefix='post')
-            except ValueError as e:
-                return jsonify({'error': str(e)}), 400
+            import os
+            from datetime import datetime
+            upload_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
+            )
+            os.makedirs(upload_dir, exist_ok=True)
+            ext = uploaded_image.filename.rsplit('.', 1)[-1].lower()
+            safe_name = f"post_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+            filepath = os.path.join(upload_dir, safe_name)
+            uploaded_image.save(filepath)
+            image_path = f'/static/uploads/{safe_name}'
 
         svc = _get_services()
         post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
@@ -289,17 +298,11 @@ def create_routes(app):
         projects = svc['project_repo'].get_all()
         services = svc['service_repo'].get_all()
 
-        # Fetch officials for this barangay
-        officials = []
-        if barangay:
-            officials = svc['official_repo'].get_by_barangay(barangay['id'])
-
         return render_template('barangay_landing.html',
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
                                is_owner=is_owner,
-                               officials=officials,
                                projects=projects,
                                services=services)
 
@@ -318,14 +321,12 @@ def create_routes(app):
 
         projects = svc['project_repo'].get_all()
         services = svc['service_repo'].get_all()
-        officials = svc['official_repo'].get_by_barangay(barangay_id)
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
                                is_owner=is_owner,
-                               officials=officials,
                                projects=projects,
                                services=services)
 
@@ -394,22 +395,20 @@ def create_routes(app):
     @login_required
     def barangay_profile(publisher_id):
         """
-        Clicking a publisher name on any post navigates here.
-        If the publisher has a barangay page, redirect to the full landing page.
-        Otherwise, show a profile with their projects, announcements & documents.
+        Barangay profile page — shows a publisher's barangay info, projects,
+        announcements, and transparency documents in one view.
+
+        Clicking a publisher name on any post in the feed navigates here.
         """
         svc = _get_services()
-
-        # If the publisher has a barangay page, go straight to the landing page
-        barangay = svc['barangay_repo'].get_by_publisher(publisher_id)
-        if barangay:
-            return redirect(url_for('barangay_landing_by_id', barangay_id=barangay['id']))
-
-        # Fallback: show publisher profile (for publishers without a barangay yet)
+        # Get publisher info
         publisher = svc['user_repo'].find_by_id(publisher_id)
         if not publisher or publisher['role'] != 'publisher':
             flash('Barangay not found.', 'error')
             return redirect(url_for('dashboard'))
+
+        # Get the barangay record for this publisher (if they created one)
+        barangay = svc['barangay_repo'].get_by_publisher(publisher_id)
 
         # Get publisher's projects
         projects = svc['project_repo'].get_by_publisher(publisher_id)
@@ -558,14 +557,20 @@ def create_routes(app):
         phone_number = request.form.get('phone_number', '').strip()
         profile_picture_path = ''
 
-        # Handle profile picture upload via FileUploadHelper (ABSTRACTION)
+        # Handle profile picture upload
         uploaded_file = request.files.get('profile_picture')
         if uploaded_file and uploaded_file.filename:
-            try:
-                helper = get_upload_helper()
-                profile_picture_path = helper.save(uploaded_file, prefix=f'profile_{current_user.id}')
-            except ValueError as e:
-                return jsonify({'error': str(e)}), 400
+            import os
+            from datetime import datetime
+            upload_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
+            )
+            os.makedirs(upload_dir, exist_ok=True)
+            ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
+            safe_name = f"profile_{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+            filepath = os.path.join(upload_dir, safe_name)
+            uploaded_file.save(filepath)
+            profile_picture_path = f'/static/uploads/{safe_name}'
 
         user_repo.update_profile(
             current_user.id,
@@ -865,74 +870,4 @@ def create_routes(app):
         success, error = svc['barangay_service'].delete_barangay(current_user, barangay_id)
         if error:
             return jsonify({'error': error}), 403
-        return jsonify({'success': True})
-
-    # ================================================================
-    # BARANGAY OFFICIALS API (publisher-only mutations)
-    # ================================================================
-
-    @app.route('/api/barangays/<int:barangay_id>/officials')
-    @login_required
-    def api_get_officials(barangay_id):
-        """API: Get all officials for a barangay."""
-        svc = _get_services()
-        officials = svc['official_repo'].get_by_barangay(barangay_id)
-        return jsonify({'officials': officials})
-
-    @app.route('/api/barangays/<int:barangay_id>/officials', methods=['POST'])
-    @login_required
-    def api_create_official(barangay_id):
-        """
-        API: Add a new official to a barangay. ONLY the owning publisher.
-
-        Accepts JSON: { name, position, rank_order }
-        """
-        svc = _get_services()
-        # Verify ownership
-        barangay = svc['barangay_repo'].get_by_id(barangay_id)
-        if not barangay or barangay.get('publisher_id') != current_user.id:
-            return jsonify({'error': 'Not authorized.'}), 403
-
-        data = request.get_json() or {}
-        name = data.get('name', '').strip()
-        position = data.get('position', '').strip()
-        if not name or not position:
-            return jsonify({'error': 'Name and position are required.'}), 400
-
-        rank = data.get('rank_order', 0)
-        official = svc['official_repo'].create(barangay_id, name, position, rank)
-        return jsonify({'official': official}), 201
-
-    @app.route('/api/officials/<int:official_id>', methods=['PUT'])
-    @login_required
-    def api_update_official(official_id):
-        """API: Update an official's info. ONLY the owning publisher."""
-        svc = _get_services()
-        official = svc['official_repo'].get_by_id(official_id)
-        if not official:
-            return jsonify({'error': 'Official not found.'}), 404
-
-        # Verify ownership via the barangay
-        barangay = svc['barangay_repo'].get_by_id(official['barangay_id'])
-        if not barangay or barangay.get('publisher_id') != current_user.id:
-            return jsonify({'error': 'Not authorized.'}), 403
-
-        data = request.get_json() or {}
-        updated = svc['official_repo'].update(official_id, **{k: v for k, v in data.items() if v is not None})
-        return jsonify({'official': updated})
-
-    @app.route('/api/officials/<int:official_id>', methods=['DELETE'])
-    @login_required
-    def api_delete_official(official_id):
-        """API: Remove an official. ONLY the owning publisher."""
-        svc = _get_services()
-        official = svc['official_repo'].get_by_id(official_id)
-        if not official:
-            return jsonify({'error': 'Official not found.'}), 404
-
-        barangay = svc['barangay_repo'].get_by_id(official['barangay_id'])
-        if not barangay or barangay.get('publisher_id') != current_user.id:
-            return jsonify({'error': 'Not authorized.'}), 403
-
-        svc['official_repo'].delete(official_id)
         return jsonify({'success': True})

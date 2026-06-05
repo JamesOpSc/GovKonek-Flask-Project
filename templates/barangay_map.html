@@ -141,15 +141,7 @@
     // Barangay center — Payatas, Quezon City
     const centerLat = 14.71309, centerLng = 121.10063;
 
-    // Draw barangay boundary — Payatas, Quezon City (full extent)
-    L.polygon([
-        [14.728, 121.088], [14.728, 121.113],
-        [14.698, 121.113], [14.698, 121.088]
-    ], {
-        color: '#0056b3', weight: 2.5, fillColor: '#0056b3',
-        fillOpacity: 0.06, dashArray: '8 4'
-    }).addTo(map).bindPopup('<strong>🏛️ Barangay Boundary</strong>');
-
+    
     // Special marker icon for barangay halls (larger, with building emoji)
     function makeBarangayIcon() {
         return L.divIcon({
@@ -158,6 +150,40 @@
         });
     }
 
+    // Additional static barangay pins
+
+    const batasanHills = {
+    name: "Barangay Batasan Hills",
+    lat: 14.690711725647242,
+    lng: 121.0960923629261,
+    link: "/barangay/batasan-hills/landing"
+    };
+
+    const bagongSilangan = {
+    name: "Barangay Bagong Silangan",
+    lat: 14.697863596837893,
+    lng: 121.11043567927592,
+    link: "/barangay/bagong-silangan/landing"
+    };
+
+    [batasanHills, bagongSilangan].forEach(b => {
+    L.marker([b.lat, b.lng], { icon: makeBarangayIcon() })
+        .addTo(map)
+        .bindPopup(`
+            <strong>🏛️ <a href="${b.link}" style="color:#0056b3;text-decoration:underline;">
+                ${escapeHtml(b.name)}
+            </a></strong>
+            <br><span style="font-size:13px;color:#475569;">
+                Barangay location marker.
+            </span>
+            <div style="margin-top:6px;">
+                <a href="${b.link}" style="display:inline-block;background:#0056b3;color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
+                    View Details →
+                </a>
+            </div>
+        `);
+    });
+    
     function makeIcon(color) {
         return L.divIcon({
             html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
