@@ -114,18 +114,18 @@
 
 <!-- Quick Action Cards -->
 <div class="quick-actions">
-    <div class="quick-action" onclick="alert('📋 Redirecting to Barangay Clearance application...')">
+    <a href="/services/barangay-clearance" class="quick-action" style="text-decoration:none;color:inherit;">
         <span class="qa-icon">📋</span> Request Clearance
-    </div>
-    <div class="quick-action" onclick="alert('🪪 Redirecting to Barangay ID registration...')">
+    </a>
+    <a href="/services/barangay-id-application" class="quick-action" style="text-decoration:none;color:inherit;">
         <span class="qa-icon">🪪</span> Apply for Barangay ID
-    </div>
-    <div class="quick-action" onclick="alert('🚨 Redirecting to Blotter report form...')">
+    </a>
+    <a href="/services/blotter-incident-report" class="quick-action" style="text-decoration:none;color:inherit;">
         <span class="qa-icon">🚨</span> File a Blotter Report
-    </div>
-    <div class="quick-action" onclick="alert('📝 Redirecting to Grievance form...')">
+    </a>
+    <a href="/services/grievance-filing" class="quick-action" style="text-decoration:none;color:inherit;">
         <span class="qa-icon">📝</span> Submit Grievance
-    </div>
+    </a>
 </div>
 
 <div id="servicesContainer">
@@ -164,11 +164,12 @@
                     <div class="category-title">📂 ${escapeHtml(cat)}</div>
                     <div class="service-grid">
                         ${items.map(s => `
-                            <a href="${s.url || '#'}" class="service-card" ${s.url === '#' ? 'onclick="alert(\'This service will be available soon!\');return false;"' : ''}>
+                            <a href="/services/${encodeURIComponent(s.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/,''))}"
+                               class="service-card">
                                 <div class="service-icon">${s.icon || '📋'}</div>
                                 <div class="service-name">${escapeHtml(s.name)}</div>
                                 <div class="service-desc">${escapeHtml(s.description)}</div>
-                                <span class="service-badge">${s.url !== '#' ? '🔗 Access Now' : '⏳ Coming Soon'}</span>
+                                <span class="service-badge">🔗 View Details</span>
                             </a>
                         `).join('')}
                     </div>

@@ -266,6 +266,22 @@ def create_routes(app):
                                name=current_user.username,
                                role=current_user.role)
 
+    @app.route('/services/<service_name>')
+    @login_required
+    def service_detail(service_name):
+        """
+        Placeholder for individual e-service pages.
+
+        Prevents 404 errors when users click service cards.
+        Real service implementations can override this route later.
+        """
+        # Convert slug back to readable name
+        readable = service_name.replace('-', ' ').title()
+        return render_template('service_placeholder.html',
+                               service_name=readable,
+                               name=current_user.username,
+                               role=current_user.role)
+
     @app.route('/documents')
     @login_required
     def documents():

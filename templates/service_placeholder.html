@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .placeholder-card {
+        max-width: 640px;
+        margin: 40px auto;
+        background: #fff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .placeholder-header {
+        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+        color: #fff;
+        padding: 32px 36px;
+        text-align: center;
+    }
+    .placeholder-header .icon { font-size: 56px; margin-bottom: 12px; }
+    .placeholder-header h2 { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+    .placeholder-header p { opacity: 0.85; font-size: 14px; }
+    .placeholder-body {
+        padding: 32px 36px;
+        text-align: center;
+    }
+    .placeholder-body .info-icon { font-size: 48px; margin-bottom: 16px; }
+    .placeholder-body h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    .placeholder-body p { font-size: 14px; color: #64748b; line-height: 1.6; margin-bottom: 20px; }
+    .placeholder-body .status-badge {
+        display: inline-block;
+        background: #fef3c7;
+        color: #92400e;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 24px;
+    }
+    .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-outline {
+        background: #fff;
+        color: #7c3aed;
+        border: 2px solid #7c3aed;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+    .btn-outline:hover { background: #f5f3ff; }
+</style>
+
+<div class="placeholder-card">
+    <div class="placeholder-header">
+        <div class="icon">📋</div>
+        <h2>{{ service_name }}</h2>
+        <p>Barangay E-Service Portal</p>
+    </div>
+    <div class="placeholder-body">
+        <div class="info-icon">🚧</div>
+        <h3>Service Page Under Development</h3>
+        <p>
+            This e-service page is currently being set up. Soon you'll be able to
+            complete your <strong>{{ service_name }}</strong> transaction entirely online —
+            no need to visit the barangay hall in person.
+        </p>
+        <div class="status-badge">⏳ Coming Soon</div>
+        <div class="btn-group">
+            <a href="{{ url_for('e_services') }}" class="btn-outline">← Back to All Services</a>
+            <a href="{{ url_for('dashboard') }}" class="btn-outline">🏠 Dashboard</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
