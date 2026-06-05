@@ -82,17 +82,24 @@ def create_routes(app):
                 flash('Invalid username or password.', 'error')
 
         return render_template('login.html')
-
+    
     @app.route('/dashboard')
     @login_required
     def dashboard():
         """Dashboard page - accessible only to authenticated users."""
         svc = _get_services()
         user_data = svc['user_repo'].find_by_id(current_user.id)
-        profile_pic = user_data['profile_picture'] if user_data else ''
-        return render_template('dashboard.html',
-                               name=current_user.username,
-                               role=current_user.role,
+        
+        # Determine the profile picture safely
+        if user_data:
+            user_dict = dict(user_data)
+            profile_pic = user_dict.get('profile_picture', 'default_avatar.png')
+        else:
+            profile_pic = 'default_avatar.png'
+            
+        return render_template('dashboard.html', 
+                               name=current_user.username, 
+                               role=current_user.role, 
                                profile_picture=profile_pic)
 
     @app.route('/profile')
