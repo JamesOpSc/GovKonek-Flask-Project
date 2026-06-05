@@ -228,8 +228,19 @@
     <div class="stat-card"><div class="stat-icon">📋</div><div class="stat-num" id="countAudit">-</div><div class="stat-label">Audit Reports</div></div>
 </div>
 
-<div class="filter-bar" id="filterBar">
-    <button class="filter-btn active" data-filter="all">📁 All Documents</button>
+<!-- ================================================================ -->
+<!-- SEARCH + FILTER BAR                                               -->
+<!-- ================================================================ -->
+<div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;flex-wrap:wrap;">
+    <input type="text" id="searchInput"
+           placeholder="🔍 Search by title or description..."
+           style="flex:3;min-width:200px;padding:11px 16px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;outline:none;">
+    <input type="date" id="dateFilter"
+           style="flex:1;min-width:150px;padding:11px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;color:#475569;outline:none;">
+    <select id="categorySelect"
+            style="flex:1;min-width:160px;padding:11px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;font-weight:600;color:#475569;cursor:pointer;background:white;outline:none;">
+        <option value="all">📁 All Categories</option>
+    </select>
 </div>
 
 <div class="doc-list" id="docList">
@@ -239,7 +250,6 @@
 <script>
 (function() {
     const docList = document.getElementById('docList');
-    const filterBar = document.getElementById('filterBar');
     let allDocs = [];
 
     function escapeHtml(s) {
@@ -264,7 +274,7 @@
             ? `<a href="${escapeHtml(d.file_url)}" download class="doc-download" style="text-decoration:none;">⬇ Download</a>`
             : `<button class="doc-download" onclick="alert('📥 No file attached yet.')">⬇ Download</button>`;
         return `
-        <div class="doc-card" data-category="${escapeHtml(d.category)}">
+        <div class="doc-card" data-category="${escapeHtml(d.category)}" data-title="${escapeHtml(d.title).toLowerCase()}" data-desc="${escapeHtml(d.description).toLowerCase()}" data-date="${d.published_date || ''}">
             <div class="doc-icon">${getDocIcon(d.category)}</div>
             <div class="doc-info">
                 <div class="doc-title">${escapeHtml(d.title)}</div>
@@ -280,6 +290,47 @@
         </div>`;
     }
 
+    function applyFilters() {
+        const search = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+        const dateVal = document.getElementById('dateFilter').value;
+        const category = document.getElementById('categorySelect').value;
+
+        document.querySelectorAll('.doc-card').forEach(card => {
+            let show = true;
+
+            // Title + description search
+            if (search) {
+                const title = card.dataset.title || '';
+                const desc = card.dataset.desc || '';
+                if (!title.includes(search) && !desc.includes(search)) {
+                    show = false;
+                }
+            }
+
+            // Date filter
+            if (dateVal && show) {
+                const cardDate = card.dataset.date || '';
+                if (cardDate !== dateVal) {
+                    show = false;
+                }
+            }
+
+            // Category dropdown
+            if (category !== 'all' && show) {
+                if (card.dataset.category !== category) {
+                    show = false;
+                }
+            }
+
+            card.style.display = show ? '' : 'none';
+        });
+
+        // Update visible count
+        const visible = document.querySelectorAll('.doc-card[style*="display:"]').length;
+        const total = document.querySelectorAll('.doc-card').length;
+        document.getElementById('countTotal').textContent = visible || total;
+    }
+
     fetch('/api/documents')
         .then(r => r.json())
         .then(data => {
@@ -289,11 +340,15 @@
                 return;
             }
 
-            // Build filter buttons
+            // Build category dropdown options
             const cats = [...new Set(allDocs.map(d => d.category))];
-            let filterHtml = '<button class="filter-btn active" data-filter="all">📁 All Documents</button>';
-            cats.forEach(c => { filterHtml += `<button class="filter-btn" data-filter="${escapeHtml(c)}">${getDocIcon(c)} ${escapeHtml(c)}</button>`; });
-            filterBar.innerHTML = filterHtml;
+            const select = document.getElementById('categorySelect');
+            cats.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c;
+                opt.textContent = `${getDocIcon(c)} ${c}`;
+                select.appendChild(opt);
+            });
 
             // Render all
             docList.innerHTML = allDocs.map(renderDoc).join('');
@@ -303,21 +358,15 @@
             document.getElementById('countBudget').textContent = allDocs.filter(d => d.category === 'Budget Report').length;
             document.getElementById('countOrdinance').textContent = allDocs.filter(d => d.category === 'Ordinance').length;
             document.getElementById('countAudit').textContent = allDocs.filter(d => d.category === 'Audit Report').length;
+
+            // Attach filter listeners
+            document.getElementById('searchInput').addEventListener('input', applyFilters);
+            document.getElementById('dateFilter').addEventListener('change', applyFilters);
+            document.getElementById('categorySelect').addEventListener('change', applyFilters);
         })
         .catch(() => {
             docList.innerHTML = '<div class="empty-state">Failed to load documents.</div>';
         });
-
-    filterBar.addEventListener('click', e => {
-        if (e.target.classList.contains('filter-btn')) {
-            document.querySelectorAll('#filterBar .filter-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            const filter = e.target.dataset.filter;
-            document.querySelectorAll('.doc-card').forEach(card => {
-                card.style.display = (filter === 'all' || card.dataset.category === filter) ? '' : 'none';
-            });
-        }
-    });
 })();
 </script>
 
