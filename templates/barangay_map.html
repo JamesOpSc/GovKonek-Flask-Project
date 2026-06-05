@@ -121,7 +121,7 @@
         maxZoom: 19
     }).addTo(map);
 
-    // --- Barangay Locations ---
+    // --- Barangay Locations (facilities, NOT projects) ---
     const locations = [
         { name: 'Barangay Hall', lat: 14.6760, lng: 121.0437, color: '#0056b3',
           desc: 'Main administrative building. Open Mon-Fri 8AM-5PM.', icon: '🏛️' },
@@ -129,12 +129,6 @@
           desc: 'Free consultations, vaccinations, maternal care.', icon: '🏥' },
         { name: 'Barangay Daycare Center', lat: 14.6768, lng: 121.0428, color: '#10b981',
           desc: 'Early childhood education for ages 3-5.', icon: '🏫' },
-        { name: 'Covered Court (Project)', lat: 14.6745, lng: 121.0440, color: '#f59e0b',
-          desc: 'Multi-purpose covered court — COMPLETED. Used for sports and events.', icon: '🏟️' },
-        { name: 'Solar Lights Phase 2 (Project)', lat: 14.6758, lng: 121.0450, color: '#f59e0b',
-          desc: '50 solar LED street lights — ONGOING. Expected completion: June 2026.', icon: '💡' },
-        { name: 'Learning Hub Site (Project)', lat: 14.6770, lng: 121.0420, color: '#f59e0b',
-          desc: 'Community Learning Hub & Digital Library — PLANNED. Construction starts July 2026.', icon: '📚' },
         { name: 'Barangay Outpost / Tanod Station', lat: 14.6742, lng: 121.0455, color: '#ef4444',
           desc: '24/7 barangay tanod outpost. Emergency hotline: 161.', icon: '🚨' },
         { name: 'Fire Station (Nearest)', lat: 14.6735, lng: 121.0460, color: '#ef4444',
@@ -145,14 +139,62 @@
           desc: 'Recreation and social services for senior citizens.', icon: '👴' },
     ];
 
-    // Load project count from API
+    // Load project count and ongoing project markers from API
     fetch('/api/projects')
         .then(r => r.json())
         .then(d => {
             if (d.projects) {
                 document.getElementById('totalProjects').textContent = d.projects.length;
+
+                // Place markers for ongoing projects that have coordinates
+                const ongoingProjects = d.projects.filter(p => p.status === 'ongoing' && p.latitude && p.longitude);
+                ongoingProjects.forEach(proj => {
+                    const budgetStr = proj.budget ? '₱' + Number(proj.budget).toLocaleString() : 'N/A';
+                    const dates = [proj.start_date, proj.end_date].filter(Boolean).join(' → ');
+                    L.marker([proj.latitude, proj.longitude], { icon: makeIcon('#f59e0b') })
+                        .addTo(map)
+                        .bindPopup(`
+                            <strong>🏗️ ${escapeHtml(proj.title)}</strong>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                                <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;font-weight:600;">ONGOING</span>
+                            </div>
+                            <div style="font-size:13px;color:#475569;margin-top:6px;line-height:1.4;">${escapeHtml(proj.description.substring(0, 100))}...</div>
+                            <div style="font-size:12px;color:#64748b;margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;">
+                                <span>💰 Budget: <strong>${budgetStr}</strong></span>
+                                ${dates ? '<span>📅 ' + dates + '</span>' : ''}
+                            </div>
+                            ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
+                        `);
+                });
+
+                // Also place markers for non-ongoing projects with coordinates
+                const otherProjects = d.projects.filter(p => p.status !== 'ongoing' && p.latitude && p.longitude);
+                const statusColors = { completed: '#10b981', planned: '#8b5cf6' };
+                const statusIcons = { completed: '✅', planned: '📋' };
+                otherProjects.forEach(proj => {
+                    const color = statusColors[proj.status] || '#94a3b8';
+                    const icon = statusIcons[proj.status] || '📌';
+                    L.marker([proj.latitude, proj.longitude], { icon: makeIcon(color) })
+                        .addTo(map)
+                        .bindPopup(`
+                            <strong>${icon} ${escapeHtml(proj.title)}</strong>
+                            <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                                <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:8px;font-weight:600;">${proj.status.toUpperCase()}</span>
+                            </div>
+                            <div style="font-size:13px;color:#475569;margin-top:6px;">${escapeHtml(proj.description.substring(0, 100))}...</div>
+                            ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
+                        `);
+                });
             }
         }).catch(() => {});
+
+    // Helper: escape HTML to prevent XSS in popups
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
 
     // Custom icon factory
     function makeIcon(color) {

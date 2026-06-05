@@ -365,10 +365,13 @@ def create_routes(app):
         image_url = data.get('image_url', '') if data else ''
         start_date = data.get('start_date', '') if data else ''
         end_date = data.get('end_date', '') if data else ''
+        latitude = data.get('latitude') if data else None
+        longitude = data.get('longitude') if data else None
         svc = _get_services()
         project, error = svc['project_service'].create_project(
             current_user, title, description, status,
-            budget, location, image_url, start_date, end_date
+            budget, location, image_url, start_date, end_date,
+            latitude, longitude
         )
         if error:
             return jsonify({'error': error}), 403
@@ -387,10 +390,13 @@ def create_routes(app):
         image_url = data.get('image_url', '') if data else ''
         start_date = data.get('start_date', '') if data else ''
         end_date = data.get('end_date', '') if data else ''
+        latitude = data.get('latitude') if data else None
+        longitude = data.get('longitude') if data else None
         svc = _get_services()
         project, error = svc['project_service'].update_project(
             current_user, project_id, title, description, status,
-            budget, location, image_url, start_date, end_date
+            budget, location, image_url, start_date, end_date,
+            latitude, longitude
         )
         if error:
             return jsonify({'error': error}), 403

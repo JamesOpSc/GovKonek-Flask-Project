@@ -110,6 +110,16 @@ def create_database():
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    # -- Migration: add lat/lng columns for map integration -------------
+    try:
+        cursor.execute("ALTER TABLE projects ADD COLUMN latitude REAL")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        cursor.execute("ALTER TABLE projects ADD COLUMN longitude REAL")
+    except sqlite3.OperationalError:
+        pass
+
     # -- E-Services -----------------------------------------------------
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS services (

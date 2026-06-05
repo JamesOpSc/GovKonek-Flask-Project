@@ -456,13 +456,14 @@ class ProjectRepository(BaseRepository):
         return dict(project) if project else None
 
     def create(self, title, description, status='ongoing', budget=0,
-               location='', image_url='', start_date='', end_date='', publisher_id=None):
+               location='', image_url='', start_date='', end_date='', publisher_id=None,
+               latitude=None, longitude=None):
         """Create a new project. Returns the created project as a dict."""
         cursor = self._execute_write(
             '''INSERT INTO projects
-               (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-            (title, description, status, budget, location, image_url, start_date, end_date, publisher_id)
+               (title, description, status, budget, location, image_url, start_date, end_date, publisher_id, latitude, longitude)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (title, description, status, budget, location, image_url, start_date, end_date, publisher_id, latitude, longitude)
         )
         project = self._execute(
             'SELECT * FROM projects WHERE id = ?', (cursor.lastrowid,), fetch='one'
@@ -470,15 +471,17 @@ class ProjectRepository(BaseRepository):
         return dict(project) if project else None
 
     def update(self, project_id, publisher_id, title, description, status,
-               budget, location, image_url, start_date, end_date):
+               budget, location, image_url, start_date, end_date,
+               latitude=None, longitude=None):
         """Update a project. Only the owning publisher can update. Returns updated project or None."""
         self._execute_write(
             '''UPDATE projects
                SET title = ?, description = ?, status = ?, budget = ?,
-                   location = ?, image_url = ?, start_date = ?, end_date = ?
+                   location = ?, image_url = ?, start_date = ?, end_date = ?,
+                   latitude = ?, longitude = ?
                WHERE id = ? AND publisher_id = ?''',
             (title, description, status, budget, location, image_url,
-             start_date, end_date, project_id, publisher_id)
+             start_date, end_date, latitude, longitude, project_id, publisher_id)
         )
         project = self._execute(
             'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'

@@ -314,7 +314,8 @@ class ProjectService:
 
     def create_project(self, user, title, description, status='ongoing',
                        budget=0, location='', image_url='',
-                       start_date='', end_date=''):
+                       start_date='', end_date='',
+                       latitude=None, longitude=None):
         """
         Create a new project. ONLY publisher (barangay captain) can create.
         Returns (project_dict, error).
@@ -337,12 +338,15 @@ class ProjectService:
             image_url=image_url.strip(),
             start_date=start_date,
             end_date=end_date,
-            publisher_id=user.id
+            publisher_id=user.id,
+            latitude=latitude,
+            longitude=longitude
         )
         return (project, None) if project else (None, "Failed to create project.")
 
     def update_project(self, user, project_id, title, description, status,
-                       budget, location, image_url, start_date, end_date):
+                       budget, location, image_url, start_date, end_date,
+                       latitude=None, longitude=None):
         """
         Update a project. ONLY the publisher who created it can edit.
         Returns (project_dict, error).
@@ -366,7 +370,9 @@ class ProjectService:
             location=location.strip(),
             image_url=image_url.strip(),
             start_date=start_date,
-            end_date=end_date
+            end_date=end_date,
+            latitude=latitude,
+            longitude=longitude
         )
         return (project, None) if project else (None, "Project not found or you are not authorized to edit it.")
 
