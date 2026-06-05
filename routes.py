@@ -92,10 +92,20 @@ def create_routes(app):
         svc = _get_services()
         user_data = svc['user_repo'].find_by_id(current_user.id)
         profile_pic = user_data['profile_picture'] if user_data else ''
+
+        # Check if publisher already has a barangay
+        barangay = None
+        has_barangay = False
+        if current_user.role == 'publisher':
+            barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+            has_barangay = barangay is not None
+
         return render_template('dashboard.html',
                                name=current_user.username,
                                role=current_user.role,
-                               profile_picture=profile_pic)
+                               profile_picture=profile_pic,
+                               barangay=barangay,
+                               has_barangay=has_barangay)
 
     @app.route('/profile')
     @login_required
@@ -268,8 +278,11 @@ def create_routes(app):
 
         # If the current user is a publisher, try to show their barangay
         barangay = None
+        is_owner = False
         if current_user.role == 'publisher':
             barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+            if barangay:
+                is_owner = True
 
         # Fall back to the default/first barangay
         if not barangay:
@@ -283,6 +296,7 @@ def create_routes(app):
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
+                               is_owner=is_owner,
                                projects=projects,
                                services=services)
 
@@ -296,6 +310,9 @@ def create_routes(app):
             flash('Barangay not found.', 'error')
             return redirect(url_for('barangay_landing'))
 
+        is_owner = (current_user.role == 'publisher' and
+                    barangay.get('publisher_id') == current_user.id)
+
         projects = svc['project_repo'].get_all()
         services = svc['service_repo'].get_all()
 
@@ -303,6 +320,7 @@ def create_routes(app):
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
+                               is_owner=is_owner,
                                projects=projects,
                                services=services)
 
@@ -371,8 +389,10 @@ def create_routes(app):
     @login_required
     def barangay_profile(publisher_id):
         """
-        Barangay profile page — shows a publisher's projects, announcements,
-        and transparency documents in one view.
+        Barangay profile page — shows a publisher's barangay info, projects,
+        announcements, and transparency documents in one view.
+
+        Clicking a publisher name on any post in the feed navigates here.
         """
         svc = _get_services()
         # Get publisher info
@@ -380,6 +400,9 @@ def create_routes(app):
         if not publisher or publisher['role'] != 'publisher':
             flash('Barangay not found.', 'error')
             return redirect(url_for('dashboard'))
+
+        # Get the barangay record for this publisher (if they created one)
+        barangay = svc['barangay_repo'].get_by_publisher(publisher_id)
 
         # Get publisher's projects
         projects = svc['project_repo'].get_by_publisher(publisher_id)
@@ -390,11 +413,17 @@ def create_routes(app):
         # Get all documents (documents table doesn't have publisher_id yet)
         documents = svc['document_repo'].get_all()
 
+        # Determine if current user is the owner
+        is_owner = (current_user.role == 'publisher' and
+                    current_user.id == publisher_id)
+
         return render_template('barangay_profile.html',
                                publisher=dict(publisher),
+                               barangay=barangay,
                                projects=projects,
                                posts=posts,
                                documents=documents,
+                               is_owner=is_owner,
                                name=current_user.username,
                                role=current_user.role)
 

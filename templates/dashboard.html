@@ -96,6 +96,108 @@
         </a>
     </div>
 
+    {% if not has_barangay %}
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- CREATE YOUR BARANGAY — quick-start card    -->
+    <!-- ═══════════════════════════════════════════ -->
+    <style>
+        .create-barangay-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 2px dashed #93c5fd;
+            border-radius: 14px;
+            padding: 32px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            flex-wrap: wrap;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .create-barangay-card:hover {
+            border-color: #0056b3;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,86,179,0.1);
+        }
+        .create-barangay-icon {
+            width: 72px; height: 72px;
+            background: #0056b3;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            flex-shrink: 0;
+            color: white;
+        }
+        .create-barangay-text { flex: 1; min-width: 200px; }
+        .create-barangay-text h3 {
+            font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 4px;
+        }
+        .create-barangay-text p {
+            font-size: 13px; color: #475569; line-height: 1.5;
+        }
+        .create-barangay-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #0056b3;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+        .create-barangay-btn:hover {
+            background: #004085;
+            box-shadow: 0 4px 14px rgba(0,86,179,0.3);
+        }
+    </style>
+    <a href="{{ url_for('barangay_landing') }}?create=1" style="text-decoration:none;color:inherit;display:block;">
+        <div class="create-barangay-card">
+            <div class="create-barangay-icon">🏛️</div>
+            <div class="create-barangay-text">
+                <h3>Set Up Your Barangay Page</h3>
+                <p>You haven't created your barangay's public landing page yet. Click here to set it up — it only takes a minute! Your constituents will be able to view barangay info, services, office hours, and more.</p>
+            </div>
+            <span class="create-barangay-btn">✨ Create My Barangay</span>
+        </div>
+    </a>
+    {% else %}
+    <!-- Quick link to manage existing barangay -->
+    <style>
+        .manage-barangay-card {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #166534;
+        }
+        .manage-barangay-card a {
+            color: #0056b3;
+            font-weight: 700;
+            text-decoration: none;
+            margin-left: auto;
+        }
+        .manage-barangay-card a:hover { text-decoration: underline; }
+    </style>
+    <div class="manage-barangay-card">
+        <span>✅</span>
+        <span>Your barangay <strong>{{ barangay.name }}</strong> is live!</span>
+        <a href="{{ url_for('barangay_landing') }}">Manage →</a>
+    </div>
+    {% endif %}
+
     {% include 'components/admin_ledger.html' %}
 
 {% else %}
