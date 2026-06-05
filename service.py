@@ -658,6 +658,8 @@ class BarangayService:
             return None, "Only the Barangay Captain can create a barangay page."
         if not name or not name.strip():
             return None, "Barangay name is required."
+        if not address or not address.strip():
+            return None, "Barangay address is required."
 
         # Check if publisher already manages a barangay
         existing = self._repo.get_by_publisher(user.id)
