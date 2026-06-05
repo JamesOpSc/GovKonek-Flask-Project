@@ -87,7 +87,7 @@ def create_routes(app):
                 flash('Invalid username or password.', 'error')
 
         return render_template('login.html')
-
+    
     @app.route('/dashboard')
     @login_required
     def dashboard():
