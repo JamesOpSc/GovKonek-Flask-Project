@@ -287,21 +287,15 @@ def create_routes(app):
 
         # Fetch barangay stats for the landing page
         projects = svc['project_repo'].get_all()
-        services = svc['service_repo'].get_all()
-
-        # Fetch officials for this barangay
-        officials = []
-        if barangay:
-            officials = svc['official_repo'].get_by_barangay(barangay['id'])
+        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
                                is_owner=is_owner,
-                               officials=officials,
                                projects=projects,
-                               services=services)
+                               announcements=announcements)
 
     @app.route('/barangay/<int:barangay_id>/landing')
     @login_required
@@ -317,17 +311,15 @@ def create_routes(app):
                     barangay.get('publisher_id') == current_user.id)
 
         projects = svc['project_repo'].get_all()
-        services = svc['service_repo'].get_all()
-        officials = svc['official_repo'].get_by_barangay(barangay_id)
+        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
                                is_owner=is_owner,
-                               officials=officials,
                                projects=projects,
-                               services=services)
+                               announcements=announcements)
 
     @app.route('/projects')
     @login_required
