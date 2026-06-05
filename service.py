@@ -25,7 +25,7 @@ from repository import (
 )
 from models import create_user_from_db
 from exceptions import (
-    ValidationError, RequiredFieldError, InvalidValueError,
+    RequiredFieldError,
     PermissionDeniedError
 )
 
