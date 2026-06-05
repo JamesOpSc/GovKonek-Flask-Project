@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .profile-header {
+        background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+        color: white;
+        padding: 32px 40px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 36px;
+        flex-shrink: 0;
+    }
+    .profile-info h2 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+    .profile-info p {
+        opacity: 0.85;
+        font-size: 14px;
+    }
+    .back-link {
+        color: white;
+        text-decoration: none;
+        font-size: 13px;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+    }
+    .back-link:hover { opacity: 1; }
+
+    .section {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 24px;
+        margin-bottom: 20px;
+    }
+    .section h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #f1f5f9;
+    }
+
+    /* Two-column layout */
+    .profile-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    @media (max-width: 768px) {
+        .profile-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Project cards */
+    .mini-project-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 10px;
+        transition: all 0.2s;
+    }
+    .mini-project-card:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+    .project-status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .dot-ongoing { background: #f59e0b; }
+    .dot-completed { background: #10b981; }
+    .dot-planned { background: #3b82f6; }
+    .mini-project-info { flex: 1; min-width: 0; }
+    .mini-project-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mini-project-meta {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    /* Post list */
+    .mini-post-item {
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 10px;
+        transition: all 0.2s;
+    }
+    .mini-post-item:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+    .mini-post-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .mini-post-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .mini-post-title a:hover { color: #0056b3; }
+    .mini-post-meta {
+        font-size: 12px;
+        color: #94a3b8;
+    }
+
+    /* Document list */
+    .mini-doc-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 8px;
+        transition: all 0.2s;
+    }
+    .mini-doc-item:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+    .mini-doc-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+    .mini-doc-info { flex: 1; min-width: 0; }
+    .mini-doc-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mini-doc-name a {
+        color: inherit;
+        text-decoration: none;
+    }
+    .mini-doc-name a:hover { color: #0056b3; }
+    .mini-doc-meta {
+        font-size: 11px;
+        color: #94a3b8;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 32px 16px;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .category-badge {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 2px 8px;
+        border-radius: 12px;
+        margin-left: 6px;
+    }
+    .badge-Announcement { background: #ede9fe; color: #7c3aed; }
+    .badge-Emergency { background: #fef2f2; color: #dc2626; }
+    .badge-Health { background: #f0f9ff; color: #0284c7; }
+    .badge-Project { background: #fdf8f2; color: #b45309; }
+</style>
+
+<div class="profile-header">
+    <div class="profile-avatar">🏛️</div>
+    <div class="profile-info" style="flex:1;">
+        <h2>{{ publisher.username }}</h2>
+        <p>Barangay Captain • {{ projects|length }} project{{ 's' if projects|length != 1 else '' }} • {{ posts|length }} announcement{{ 's' if posts|length != 1 else '' }}</p>
+        <a href="{{ url_for('dashboard') }}" class="back-link">← Back to Dashboard</a>
+    </div>
+</div>
+
+<div class="profile-grid">
+    <!-- LEFT COLUMN: Projects -->
+    <div class="section">
+        <h3>🏗️ Barangay Projects</h3>
+        {% if projects %}
+            {% for project in projects %}
+            <div class="mini-project-card">
+                <div class="project-status-dot dot-{{ project.status }}"></div>
+                <div class="mini-project-info">
+                    <div class="mini-project-title">{{ project.title }}</div>
+                    <div class="mini-project-meta">
+                        {{ project.status|capitalize }} • 
+                        {% if project.location %}📍 {{ project.location }}{% else %}Barangay-wide{% endif %} • 
+                        💰 ₱{{ "%.0f"|format(project.budget) if project.budget else '0' }}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">No projects yet.</div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT COLUMN: Announcements & Transparency -->
+    <div>
+        <!-- Announcements -->
+        <div class="section">
+            <h3>📢 Announcements & Updates</h3>
+            {% if posts %}
+                {% for post in posts %}
+                <div class="mini-post-item">
+                    <div class="mini-post-title">
+                        <a href="{{ url_for('post_detail', post_id=post.id) }}">{{ post.title }}</a>
+                        <span class="category-badge badge-{{ post.category }}">{{ post.category }}</span>
+                    </div>
+                    <div class="mini-post-meta">
+                        {{ post.created_at[:10] if post.created_at else '' }}
+                        {% if post.content %}
+                            — {{ post.content[:80] }}{% if post.content|length > 80 %}...{% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">No announcements yet.</div>
+            {% endif %}
+        </div>
+
+        <!-- Transparency Documents -->
+        <div class="section">
+            <h3>📁 Transparency Documents</h3>
+            {% if documents %}
+                {% for doc in documents %}
+                <div class="mini-doc-item">
+                    <div class="mini-doc-icon">
+                        {% set ext = doc.file_url.split('.')[-1].lower() if doc.file_url and '.' in doc.file_url else '' %}
+                        {% if ext in ['pdf'] %}📕
+                        {% elif ext in ['doc', 'docx'] %}📘
+                        {% elif ext in ['xls', 'xlsx', 'csv'] %}📗
+                        {% elif ext in ['png', 'jpg', 'jpeg'] %}🖼️
+                        {% else %}📄{% endif %}
+                    </div>
+                    <div class="mini-doc-info">
+                        <div class="mini-doc-name">
+                            {% if doc.file_url and doc.file_url != '#' %}
+                            <a href="{{ doc.file_url }}" target="_blank">{{ doc.title }}</a>
+                            {% else %}
+                            {{ doc.title }}
+                            {% endif %}
+                        </div>
+                        <div class="mini-doc-meta">
+                            {{ doc.category }} • {{ doc.file_size or '' }} • {{ doc.published_date or '' }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">No documents uploaded yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

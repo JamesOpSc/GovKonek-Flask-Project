@@ -329,6 +329,10 @@ class ProjectService:
         if status not in self.VALID_STATUSES:
             status = 'ongoing'
 
+        # Validate date range: end date must not be before start date
+        if start_date and end_date and end_date < start_date:
+            return None, "End date cannot be before start date."
+
         project = self._repo.create(
             title=title.strip(),
             description=description.strip(),
@@ -359,6 +363,10 @@ class ProjectService:
             return None, "Description is required."
         if status not in self.VALID_STATUSES:
             status = 'ongoing'
+
+        # Validate date range: end date must not be before start date
+        if start_date and end_date and end_date < start_date:
+            return None, "End date cannot be before start date."
 
         project = self._repo.update(
             project_id=project_id,

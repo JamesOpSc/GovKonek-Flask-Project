@@ -314,6 +314,37 @@ def create_routes(app):
                                role=current_user.role,
                                user_id=current_user.id)
 
+    @app.route('/barangay/<int:publisher_id>')
+    @login_required
+    def barangay_profile(publisher_id):
+        """
+        Barangay profile page — shows a publisher's projects, announcements,
+        and transparency documents in one view.
+        """
+        svc = _get_services()
+        # Get publisher info
+        publisher = svc['user_repo'].find_by_id(publisher_id)
+        if not publisher or publisher['role'] != 'publisher':
+            flash('Barangay not found.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # Get publisher's projects
+        projects = svc['project_repo'].get_by_publisher(publisher_id)
+
+        # Get publisher's posts (announcements / transparency)
+        posts = svc['post_repo'].get_posts_by_publisher(publisher_id)
+
+        # Get all documents (documents table doesn't have publisher_id yet)
+        documents = svc['document_repo'].get_all()
+
+        return render_template('barangay_profile.html',
+                               publisher=dict(publisher),
+                               projects=projects,
+                               posts=posts,
+                               documents=documents,
+                               name=current_user.username,
+                               role=current_user.role)
+
     # ================================================================
     # FEATURE DATA APIs
     # ================================================================

@@ -58,6 +58,8 @@
         margin-top: 12px;
     }
     .post-hero .publisher-info strong { color: #0056b3; }
+    .post-hero .publisher-info a { text-decoration: none; color: inherit; }
+    .post-hero .publisher-info a:hover strong { text-decoration: underline; }
 
     .post-body {
         padding: 24px 36px;
@@ -211,7 +213,7 @@
         </div>
         <h1>{{ post.post.title }}</h1>
         <div class="publisher-info">
-            Published by <strong>{{ post.post.publisher_name }}</strong>
+            Published by <a href="{{ url_for('barangay_profile', publisher_id=post.post.publisher_id) }}"><strong>{{ post.post.publisher_name }}</strong></a>
         </div>
     </div>
 

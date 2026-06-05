@@ -690,7 +690,8 @@
         if (!dateStr) return '';
         const now = new Date();
         // Handle SQLite format "YYYY-MM-DD HH:MM:SS" by replacing space with T
-        const normalized = dateStr.replace(' ', 'T');
+        // Append Z to indicate UTC since SQLite stores timestamps in UTC
+        const normalized = dateStr.replace(' ', 'T') + 'Z';
         const date = new Date(normalized);
         if (isNaN(date.getTime())) return dateStr;
         const diff = Math.floor((now - date) / 1000);

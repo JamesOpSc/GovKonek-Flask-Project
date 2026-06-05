@@ -341,6 +341,16 @@ class PostRepository(BaseRepository):
             WHERE p.id = ?
         ''', (post_id,), fetch='one')
 
+    def get_posts_by_publisher(self, publisher_id):
+        """Fetch all published posts by a specific publisher."""
+        return [dict(p) for p in self._execute('''
+            SELECT p.*, u.username as publisher_name
+            FROM posts p
+            JOIN users u ON p.publisher_id = u.id
+            WHERE p.publisher_id = ? AND p.status = 'published'
+            ORDER BY p.created_at DESC
+        ''', (publisher_id,), fetch='all')]
+
     # -- comments ---------------------------------------------------------
 
     def get_comments_for_post(self, post_id):
@@ -454,6 +464,13 @@ class ProjectRepository(BaseRepository):
             'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'
         )
         return dict(project) if project else None
+
+    def get_by_publisher(self, publisher_id):
+        """Fetch all projects by a specific publisher, newest first."""
+        return [dict(p) for p in self._execute(
+            'SELECT * FROM projects WHERE publisher_id = ? ORDER BY created_at DESC',
+            (publisher_id,), fetch='all'
+        )]
 
     def create(self, title, description, status='ongoing', budget=0,
                location='', image_url='', start_date='', end_date='', publisher_id=None,

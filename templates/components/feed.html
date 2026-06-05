@@ -82,6 +82,8 @@
         margin-top: 8px;
     }
     .post-publisher strong { color: #0056b3; }
+    .publisher-link { text-decoration: none; color: inherit; }
+    .publisher-link:hover strong { color: #004085; text-decoration: underline; }
 
     /* Expanded state */
     .post-card.expanded {
@@ -313,7 +315,7 @@
                 </div>
                 <h4 class="post-title">${escapeHtml(post.title)}</h4>
                 <p class="post-snippet">${escapeHtml(snippet)}</p>
-                <div class="post-publisher">Posted by <strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></div>
+                <div class="post-publisher">Posted by <a href="/barangay/${post.publisher_id}" class="publisher-link" onclick="event.stopPropagation()"><strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></a></div>
             </div>
             <div class="expand-hint" onclick="expandPost(event, ${post.id})">
                 Click to preview ▼ &nbsp;|&nbsp; <a href="${detailUrl}" style="color:#0056b3;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">Read full post →</a>
