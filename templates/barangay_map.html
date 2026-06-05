@@ -113,7 +113,7 @@
 
 <script>
 (function() {
-    const map = L.map('barangayMap').setView([14.6760, 121.0437], 15);
+    const map = L.map('barangayMap').setView([14.71309, 121.10063], 14);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
@@ -137,13 +137,13 @@
     const statusColors = { ongoing: '#f59e0b', completed: '#10b981', planned: '#8b5cf6' };
     const statusIcons = { ongoing: '🏗️', completed: '✅', planned: '📋' };
 
-    // Barangay center
-    const centerLat = 14.6760, centerLng = 121.0437;
+    // Barangay center — Payatas, Quezon City
+    const centerLat = 14.71309, centerLng = 121.10063;
 
-    // Draw barangay boundary
+    // Draw barangay boundary — Payatas, Quezon City (full extent)
     L.polygon([
-        [14.6730, 121.0405], [14.6730, 121.0470],
-        [14.6790, 121.0470], [14.6790, 121.0405]
+        [14.728, 121.088], [14.728, 121.113],
+        [14.698, 121.113], [14.698, 121.088]
     ], {
         color: '#0056b3', weight: 2.5, fillColor: '#0056b3',
         fillOpacity: 0.06, dashArray: '8 4'
