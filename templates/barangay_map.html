@@ -191,11 +191,11 @@
         });
     }
 
-    // Fetch barangays and place markers
+    // Fetch barangays and place markers (exclude default/template barangay with no publisher)
     fetch('/api/barangays')
         .then(r => r.json())
         .then(d => {
-            const barangays = d.barangays || [];
+            const barangays = (d.barangays || []).filter(b => b.publisher_id !== null && b.publisher_id !== undefined);
             document.getElementById('barangayCount').textContent = barangays.length;
 
             // If no barangays from API, place a fallback default marker
