@@ -104,16 +104,15 @@
 <div class="info-panel">
     <h4 style="font-weight:700; margin-bottom:14px;">📍 Barangay at a Glance</h4>
     <div class="info-card">
-        <div class="info-stat"><div class="stat-num" id="totalProjects">5</div><div class="stat-label">Active Projects</div></div>
-        <div class="info-stat"><div class="stat-num">12,450</div><div class="stat-label">Total Population</div></div>
-        <div class="info-stat"><div class="stat-num">7</div><div class="stat-label">Puroks / Zones</div></div>
-        <div class="info-stat"><div class="stat-num">8</div><div class="stat-label">E-Services</div></div>
+        <div class="info-stat"><div class="stat-num" id="totalProjects">-</div><div class="stat-label">Total Projects</div></div>
+        <div class="info-stat"><div class="stat-num" id="ongoingCount">-</div><div class="stat-label">Ongoing</div></div>
+        <div class="info-stat"><div class="stat-num" id="completedCount">-</div><div class="stat-label">Completed</div></div>
+        <div class="info-stat"><div class="stat-num" id="plannedCount">-</div><div class="stat-label">Planned</div></div>
     </div>
 </div>
 
 <script>
 (function() {
-    // Approximate center of Quezon City / Metro Manila area
     const map = L.map('barangayMap').setView([14.6760, 121.0437], 15);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -121,74 +120,6 @@
         maxZoom: 19
     }).addTo(map);
 
-    // --- Barangay Locations (facilities, NOT projects) ---
-    const locations = [
-        { name: 'Barangay Hall', lat: 14.6760, lng: 121.0437, color: '#0056b3',
-          desc: 'Main administrative building. Open Mon-Fri 8AM-5PM.', icon: '🏛️' },
-        { name: 'Barangay Health Center', lat: 14.6752, lng: 121.0445, color: '#10b981',
-          desc: 'Free consultations, vaccinations, maternal care.', icon: '🏥' },
-        { name: 'Barangay Daycare Center', lat: 14.6768, lng: 121.0428, color: '#10b981',
-          desc: 'Early childhood education for ages 3-5.', icon: '🏫' },
-        { name: 'Barangay Outpost / Tanod Station', lat: 14.6742, lng: 121.0455, color: '#ef4444',
-          desc: '24/7 barangay tanod outpost. Emergency hotline: 161.', icon: '🚨' },
-        { name: 'Fire Station (Nearest)', lat: 14.6735, lng: 121.0460, color: '#ef4444',
-          desc: 'Nearest BFP fire station. Emergency: 911.', icon: '🚒' },
-        { name: 'Barangay Plaza & Park', lat: 14.6765, lng: 121.0430, color: '#8b5cf6',
-          desc: 'Public park with playground, benches, and free WiFi zone.', icon: '🌳' },
-        { name: 'Senior Citizen Center', lat: 14.6775, lng: 121.0442, color: '#8b5cf6',
-          desc: 'Recreation and social services for senior citizens.', icon: '👴' },
-    ];
-
-    // Load project count and ongoing project markers from API
-    fetch('/api/projects')
-        .then(r => r.json())
-        .then(d => {
-            if (d.projects) {
-                document.getElementById('totalProjects').textContent = d.projects.length;
-
-                // Place markers for ongoing projects that have coordinates
-                const ongoingProjects = d.projects.filter(p => p.status === 'ongoing' && p.latitude && p.longitude);
-                ongoingProjects.forEach(proj => {
-                    const budgetStr = proj.budget ? '₱' + Number(proj.budget).toLocaleString() : 'N/A';
-                    const dates = [proj.start_date, proj.end_date].filter(Boolean).join(' → ');
-                    L.marker([proj.latitude, proj.longitude], { icon: makeIcon('#f59e0b') })
-                        .addTo(map)
-                        .bindPopup(`
-                            <strong>🏗️ ${escapeHtml(proj.title)}</strong>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">
-                                <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:8px;font-weight:600;">ONGOING</span>
-                            </div>
-                            <div style="font-size:13px;color:#475569;margin-top:6px;line-height:1.4;">${escapeHtml(proj.description.substring(0, 100))}...</div>
-                            <div style="font-size:12px;color:#64748b;margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;">
-                                <span>💰 Budget: <strong>${budgetStr}</strong></span>
-                                ${dates ? '<span>📅 ' + dates + '</span>' : ''}
-                            </div>
-                            ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
-                        `);
-                });
-
-                // Also place markers for non-ongoing projects with coordinates
-                const otherProjects = d.projects.filter(p => p.status !== 'ongoing' && p.latitude && p.longitude);
-                const statusColors = { completed: '#10b981', planned: '#8b5cf6' };
-                const statusIcons = { completed: '✅', planned: '📋' };
-                otherProjects.forEach(proj => {
-                    const color = statusColors[proj.status] || '#94a3b8';
-                    const icon = statusIcons[proj.status] || '📌';
-                    L.marker([proj.latitude, proj.longitude], { icon: makeIcon(color) })
-                        .addTo(map)
-                        .bindPopup(`
-                            <strong>${icon} ${escapeHtml(proj.title)}</strong>
-                            <div style="font-size:12px;color:#64748b;margin-top:4px;">
-                                <span style="background:#f1f5f9;color:#475569;padding:2px 8px;border-radius:8px;font-weight:600;">${proj.status.toUpperCase()}</span>
-                            </div>
-                            <div style="font-size:13px;color:#475569;margin-top:6px;">${escapeHtml(proj.description.substring(0, 100))}...</div>
-                            ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
-                        `);
-                });
-            }
-        }).catch(() => {});
-
-    // Helper: escape HTML to prevent XSS in popups
     function escapeHtml(str) {
         if (!str) return '';
         const div = document.createElement('div');
@@ -196,31 +127,87 @@
         return div.innerHTML;
     }
 
-    // Custom icon factory
     function makeIcon(color) {
         return L.divIcon({
             html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
-            iconSize: [28, 28],
-            iconAnchor: [14, 14],
-            popupAnchor: [0, -18]
+            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
         });
     }
 
-    locations.forEach(loc => {
-        L.marker([loc.lat, loc.lng], { icon: makeIcon(loc.color) })
-            .addTo(map)
-            .bindPopup(`<strong>${loc.icon} ${loc.name}</strong><br><span style="font-size:13px;color:#475569;">${loc.desc}</span>`);
-    });
+    const statusColors = { ongoing: '#f59e0b', completed: '#10b981', planned: '#8b5cf6' };
+    const statusIcons = { ongoing: '🏗️', completed: '✅', planned: '📋' };
 
-    // Draw a rough barangay boundary (polygon)
-    const boundary = [
+    // Barangay center
+    const centerLat = 14.6760, centerLng = 121.0437;
+
+    // Draw barangay boundary
+    L.polygon([
         [14.6730, 121.0405], [14.6730, 121.0470],
         [14.6790, 121.0470], [14.6790, 121.0405]
-    ];
-    L.polygon(boundary, {
+    ], {
         color: '#0056b3', weight: 2.5, fillColor: '#0056b3',
         fillOpacity: 0.06, dashArray: '8 4'
     }).addTo(map).bindPopup('<strong>🏛️ Barangay Boundary</strong>');
+
+    // Barangay Hall marker (always shown)
+    L.marker([centerLat, centerLng], { icon: makeIcon('#0056b3') })
+        .addTo(map)
+        .bindPopup('<strong>🏛️ Barangay Hall</strong><br><span style="font-size:13px;color:#475569;">Main administrative building.</span>');
+
+    // Fetch projects and place markers
+    fetch('/api/projects')
+        .then(r => r.json())
+        .then(d => {
+            const projects = d.projects || [];
+            document.getElementById('totalProjects').textContent = projects.length;
+            document.getElementById('ongoingCount').textContent = projects.filter(p => p.status === 'ongoing').length;
+            document.getElementById('completedCount').textContent = projects.filter(p => p.status === 'completed').length;
+            document.getElementById('plannedCount').textContent = projects.filter(p => p.status === 'planned').length;
+
+            projects.forEach((proj, idx) => {
+                // Use project's lat/lng if available, otherwise offset from center
+                let lat, lng;
+                if (proj.latitude && proj.longitude) {
+                    lat = proj.latitude;
+                    lng = proj.longitude;
+                } else {
+                    // Scatter projects around the barangay center
+                    const angle = (idx / projects.length) * Math.PI * 2;
+                    const radius = 0.0015 + (idx * 0.0002);
+                    lat = centerLat + Math.cos(angle) * radius;
+                    lng = centerLng + Math.sin(angle) * radius;
+                }
+
+                const status = proj.status || 'ongoing';
+                const color = statusColors[status] || '#94a3b8';
+                const icon = statusIcons[status] || '📌';
+                const budgetStr = proj.budget ? '₱' + Number(proj.budget).toLocaleString() : 'N/A';
+                const dates = [proj.start_date, proj.end_date].filter(Boolean).join(' → ');
+
+                L.marker([lat, lng], { icon: makeIcon(color) })
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>${icon} ${escapeHtml(proj.title)}</strong>
+                        <div style="font-size:12px;color:#64748b;margin-top:4px;">
+                            <span style="background:${color}15;color:${color};padding:2px 8px;border-radius:8px;font-weight:600;">${status.toUpperCase()}</span>
+                        </div>
+                        <div style="font-size:13px;color:#475569;margin-top:6px;line-height:1.4;">${escapeHtml((proj.description || '').substring(0, 120))}...</div>
+                        <div style="font-size:12px;color:#64748b;margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;">
+                            <span>💰 <strong>${budgetStr}</strong></span>
+                            ${dates ? '<span>📅 ' + dates + '</span>' : ''}
+                        </div>
+                        ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
+                    `);
+            });
+        }).catch(() => {});
+
+    // Legend
+    document.querySelector('.map-legend').innerHTML = `
+        <div class="legend-item"><span class="legend-dot" style="background:#0056b3;"></span> Barangay Hall</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Ongoing Projects</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Completed Projects</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#8b5cf6;"></span> Planned Projects</div>
+    `;
 })();
 </script>
 {% endblock %}
