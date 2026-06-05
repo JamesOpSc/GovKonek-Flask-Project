@@ -201,6 +201,49 @@ def create_database():
         )
     ''')
 
+    # -- Barangays (configurable landing page per barangay) ---------------
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS barangays (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL DEFAULT 'Barangay Hall',
+            description TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            facebook TEXT DEFAULT '',
+            office_hours_weekday TEXT DEFAULT '8:00 AM – 5:00 PM',
+            office_hours_saturday TEXT DEFAULT '8:00 AM – 12:00 PM',
+            motto TEXT DEFAULT '',
+            hero_image TEXT DEFAULT '',
+            latitude REAL DEFAULT 14.71309,
+            longitude REAL DEFAULT 121.10063,
+            publisher_id INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (publisher_id) REFERENCES users(id)
+        )
+    ''')
+
+    # Seed a default barangay if none exists
+    cursor.execute('SELECT COUNT(*) FROM barangays')
+    if cursor.fetchone()[0] == 0:
+        cursor.execute('''
+            INSERT INTO barangays (name, description, address, phone, email, facebook,
+                                   office_hours_weekday, office_hours_saturday, motto, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            'Barangay Hall',
+            'The heart of local governance in our community. We are committed to transparent, efficient, and people-centered public service.',
+            'Barangay Hall, Payatas, Quezon City, Metro Manila',
+            '(02) 8XXX-XXXX',
+            'barangayhall@govkonek.ph',
+            'facebook.com/BarangayPayatasOfficial',
+            '8:00 AM – 5:00 PM',
+            '8:00 AM – 12:00 PM',
+            'Serbisyong Tapat, Para sa Lahat!',
+            14.71309,
+            121.10063
+        ))
+
     connection.commit()
     connection.close()
     print("Database and all tables created successfully!")

@@ -603,3 +603,115 @@ class DocumentService:
         # Delete from database
         self._repo.delete(document_id, user.id)
         return True, None
+
+
+# ===========================================================================
+# BarangayService — Barangay landing-page business logic
+# ===========================================================================
+
+class BarangayService:
+    """
+    Business logic for managing barangay landing-page configuration.
+
+    Publishers can create and edit their barangay's public landing page.
+    All users can view any barangay's landing page.
+    """
+
+    def __init__(self, barangay_repo=None):
+        """
+        @param barangay_repo: BarangayRepository instance.
+        """
+        from repository import BarangayRepository
+        self._repo = barangay_repo or BarangayRepository()
+
+    # -- read (all users) ------------------------------------------------
+
+    def get_all(self):
+        """Get all barangays."""
+        return self._repo.get_all()
+
+    def get_by_id(self, barangay_id):
+        """Get a single barangay by ID."""
+        return self._repo.get_by_id(barangay_id)
+
+    def get_by_publisher(self, publisher_id):
+        """Get the barangay managed by a specific publisher."""
+        return self._repo.get_by_publisher(publisher_id)
+
+    def get_first(self):
+        """Get the default/first barangay."""
+        return self._repo.get_first()
+
+    # -- publisher-only mutations ----------------------------------------
+
+    def create_barangay(self, user, name, description='', address='',
+                        phone='', email='', facebook='',
+                        office_hours_weekday='8:00 AM – 5:00 PM',
+                        office_hours_saturday='8:00 AM – 12:00 PM',
+                        motto='', latitude=14.71309, longitude=121.10063):
+        """
+        Create a new barangay landing page. ONLY publisher can create.
+
+        Returns (barangay_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can create a barangay page."
+        if not name or not name.strip():
+            return None, "Barangay name is required."
+
+        # Check if publisher already manages a barangay
+        existing = self._repo.get_by_publisher(user.id)
+        if existing:
+            return None, "You already manage a barangay. Edit it instead."
+
+        barangay = self._repo.create(
+            name=name.strip(),
+            description=description.strip() if description else '',
+            address=address.strip() if address else '',
+            phone=phone.strip() if phone else '',
+            email=email.strip() if email else '',
+            facebook=facebook.strip() if facebook else '',
+            office_hours_weekday=office_hours_weekday,
+            office_hours_saturday=office_hours_saturday,
+            motto=motto.strip() if motto else '',
+            latitude=latitude,
+            longitude=longitude,
+            publisher_id=user.id
+        )
+        return (barangay, None) if barangay else (None, "Failed to create barangay page.")
+
+    def update_barangay(self, user, barangay_id, **fields):
+        """
+        Update a barangay's landing-page info. ONLY the owning publisher.
+
+        Returns (barangay_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can edit the barangay page."
+
+        barangay = self._repo.get_by_id(barangay_id)
+        if not barangay:
+            return None, "Barangay not found."
+        if barangay.get('publisher_id') != user.id:
+            return None, "You are not authorized to edit this barangay."
+
+        updated = self._repo.update(barangay_id, user.id, **fields)
+        return (updated, None) if updated else (None, "Failed to update barangay page.")
+
+    def delete_barangay(self, user, barangay_id):
+        """
+        Delete a barangay page. ONLY the owning publisher.
+
+        Returns (success: bool, error).
+        """
+        if not user.can_publish():
+            return False, "Only the Barangay Captain can delete the barangay page."
+
+        barangay = self._repo.get_by_id(barangay_id)
+        if not barangay:
+            return False, "Barangay not found."
+        if barangay.get('publisher_id') != user.id:
+            return False, "You are not authorized to delete this barangay."
+
+        self._repo.delete(barangay_id, user.id)
+        return True, None

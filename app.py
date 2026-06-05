@@ -24,8 +24,8 @@ REFACTORED for testability:
 from flask import Flask
 from flask_login import LoginManager
 from config import Config, SECRET_KEY, LOGIN_VIEW
-from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository
-from service import AuthService, PostService, VoiceService, ProjectService, DocumentService
+from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository, BarangayRepository
+from service import AuthService, PostService, VoiceService, ProjectService, DocumentService, BarangayService
 from models import create_user_from_db
 from routes import create_routes
 
@@ -55,6 +55,7 @@ def _build_services(app, config):
     service_repo = ServiceRepository(db_path=config.db_name)
     document_repo = DocumentRepository(db_path=config.db_name)
     voice_repo = VoiceRepository(db_path=config.db_name)
+    barangay_repo = BarangayRepository(db_path=config.db_name)
 
     # -- services (injectable repositories) -------------------------------
     auth_service = AuthService(user_repo=user_repo)
@@ -62,6 +63,7 @@ def _build_services(app, config):
     voice_service = VoiceService(voice_repo=voice_repo)
     project_service = ProjectService(project_repo=project_repo)
     document_service = DocumentService(document_repo=document_repo, config=config)
+    barangay_service = BarangayService(barangay_repo=barangay_repo)
 
     # -- attach to app ----------------------------------------------------
     app.extensions['config'] = config
@@ -76,6 +78,8 @@ def _build_services(app, config):
     app.extensions['voice_service'] = voice_service
     app.extensions['project_service'] = project_service
     app.extensions['document_service'] = document_service
+    app.extensions['barangay_repo'] = barangay_repo
+    app.extensions['barangay_service'] = barangay_service
 
 
 # ===========================================================================

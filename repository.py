@@ -794,3 +794,96 @@ class VoiceRepository(BaseRepository):
                 (delta, voice_post_id)
             )
             return 'added', delta
+
+
+# ===========================================================================
+# BarangayRepository — Barangay landing page data
+# ===========================================================================
+
+class BarangayRepository(BaseRepository):
+    """
+    Repository for barangay landing-page configuration.
+
+    INHERITANCE: Extends BaseRepository.
+    Each barangay (publisher) can manage their own landing-page content.
+    """
+
+    def get_all(self):
+        """Fetch all barangays, newest first."""
+        return [dict(b) for b in self._execute(
+            'SELECT * FROM barangays ORDER BY created_at DESC', fetch='all'
+        )]
+
+    def get_by_id(self, barangay_id):
+        """Fetch a single barangay by ID."""
+        row = self._execute(
+            'SELECT * FROM barangays WHERE id = ?', (barangay_id,), fetch='one'
+        )
+        return dict(row) if row else None
+
+    def get_by_publisher(self, publisher_id):
+        """Fetch the barangay managed by a specific publisher."""
+        row = self._execute(
+            'SELECT * FROM barangays WHERE publisher_id = ?', (publisher_id,), fetch='one'
+        )
+        return dict(row) if row else None
+
+    def get_first(self):
+        """Fetch the first/default barangay (used for the generic landing page)."""
+        row = self._execute(
+            'SELECT * FROM barangays ORDER BY id ASC LIMIT 1', fetch='one'
+        )
+        return dict(row) if row else None
+
+    def create(self, name, description='', address='', phone='', email='',
+               facebook='', office_hours_weekday='8:00 AM – 5:00 PM',
+               office_hours_saturday='8:00 AM – 12:00 PM', motto='',
+               latitude=14.71309, longitude=121.10063, publisher_id=None):
+        """Create a new barangay. Returns the created barangay as a dict."""
+        cursor = self._execute_write(
+            '''INSERT INTO barangays
+               (name, description, address, phone, email, facebook,
+                office_hours_weekday, office_hours_saturday, motto,
+                latitude, longitude, publisher_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (name, description, address, phone, email, facebook,
+             office_hours_weekday, office_hours_saturday, motto,
+             latitude, longitude, publisher_id)
+        )
+        return self.get_by_id(cursor.lastrowid)
+
+    def update(self, barangay_id, publisher_id, **fields):
+        """
+        Update a barangay's info. Only the owning publisher can update.
+
+        @param fields: Keyword args matching column names.
+                       Supported: name, description, address, phone, email,
+                       facebook, office_hours_weekday, office_hours_saturday,
+                       motto, latitude, longitude.
+        """
+        allowed = ['name', 'description', 'address', 'phone', 'email',
+                   'facebook', 'office_hours_weekday', 'office_hours_saturday',
+                   'motto', 'latitude', 'longitude']
+        set_clauses = []
+        params = []
+        for key in allowed:
+            if key in fields:
+                set_clauses.append(f'{key} = ?')
+                params.append(fields[key])
+        if not set_clauses:
+            return self.get_by_id(barangay_id)
+
+        params.extend([barangay_id, publisher_id])
+        self._execute_write(
+            f"UPDATE barangays SET {', '.join(set_clauses)} WHERE id = ? AND publisher_id = ?",
+            tuple(params)
+        )
+        return self.get_by_id(barangay_id)
+
+    def delete(self, barangay_id, publisher_id):
+        """Delete a barangay. Only the owning publisher can delete."""
+        self._execute_write(
+            'DELETE FROM barangays WHERE id = ? AND publisher_id = ?',
+            (barangay_id, publisher_id)
+        )
+        return True
