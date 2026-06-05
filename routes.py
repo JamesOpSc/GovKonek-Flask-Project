@@ -90,7 +90,7 @@ def create_routes(app):
                 flash('Invalid username or password.', 'error')
 
         return render_template('login.html')
-
+    
     @app.route('/dashboard')
     @login_required
     def dashboard():
@@ -296,7 +296,7 @@ def create_routes(app):
 
         # Fetch barangay stats for the landing page
         projects = svc['project_repo'].get_all()
-        services = svc['service_repo'].get_all()
+        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
@@ -304,7 +304,7 @@ def create_routes(app):
                                barangay=barangay,
                                is_owner=is_owner,
                                projects=projects,
-                               services=services)
+                               announcements=announcements)
 
     @app.route('/barangay/<int:barangay_id>/landing')
     @login_required
@@ -321,6 +321,7 @@ def create_routes(app):
 
         projects = svc['project_repo'].get_all()
         services = svc['service_repo'].get_all()
+        officials = svc['official_repo'].get_by_barangay(barangay_id)
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
@@ -328,7 +329,7 @@ def create_routes(app):
                                barangay=barangay,
                                is_owner=is_owner,
                                projects=projects,
-                               services=services)
+                               announcements=announcements)
 
     @app.route('/projects')
     @login_required
