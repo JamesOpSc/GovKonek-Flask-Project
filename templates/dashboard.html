@@ -103,9 +103,11 @@
         <a href="{{ url_for('profile') }}" class="profile-btn" title="View My Profile">👤</a>
     </div>
 
-    <div class="alert-banner">
+    <div class="alert-banner" id="emergencyAlert" style="display:none;">
         <span style="font-size: 20px;">⚠️</span>
-        <div><strong>URGENT:</strong> Scheduled Water Interruption for Zone 3 starting tomorrow, 8:00 AM to 5:00 PM.</div>
+        <div style="flex:1;cursor:pointer;" id="emergencyText" onclick="goToEmergency()">
+            <strong>URGENT:</strong> <span id="emergencyTitle"></span>
+        </div>
     </div>
 
     {% include 'components/utility_bar.html' %}
@@ -120,6 +122,27 @@
             {% include 'components/tracker.html' %}
         </div>
     </div>
+
+    <script>
+    // Fetch latest emergency announcement for the alert banner
+    let emergencyPostId = null;
+    (async function() {
+        try {
+            const resp = await fetch('/api/posts?category=Emergency&sort=newest');
+            const data = await resp.json();
+            const emergencies = data.posts || [];
+            if (emergencies.length > 0) {
+                const latest = emergencies[0];
+                emergencyPostId = latest.id;
+                document.getElementById('emergencyTitle').textContent = latest.title;
+                document.getElementById('emergencyAlert').style.display = 'flex';
+            }
+        } catch(e) { /* silently ignore — alert stays hidden */ }
+    })();
+    function goToEmergency() {
+        if (emergencyPostId) window.location.href = '/post/' + emergencyPostId;
+    }
+    </script>
 
 {% endif %}
 {% endblock %}
