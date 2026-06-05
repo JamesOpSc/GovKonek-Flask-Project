@@ -16,6 +16,7 @@ From the crash course (event-driven_and_db_prog):
 """
 
 import os
+import uuid
 from datetime import datetime
 
 
@@ -42,16 +43,11 @@ class FileUploadHelper:
         Initialize the upload helper.
 
         @param upload_dir: Absolute or relative path to the upload directory.
-                           Defaults to 'static/uploads' relative to project root.
+                           Defaults to 'static/uploads'.
         @param allowed_extensions: Set of lowercase file extensions to allow.
                                    Defaults to ALLOWED_IMAGE_EXTENSIONS.
         """
-        if upload_dir is None:
-            # Default: static/uploads/ relative to this file's parent (project root)
-            project_root = os.path.dirname(os.path.abspath(__file__))
-            upload_dir = os.path.join(project_root, 'static', 'uploads')
-
-        self._upload_dir = upload_dir
+        self._upload_dir = upload_dir or 'static/uploads'
         self._allowed_extensions = allowed_extensions or self.ALLOWED_IMAGE_EXTENSIONS
 
     # -- public API -------------------------------------------------------
@@ -89,9 +85,10 @@ class FileUploadHelper:
         # Ensure directory exists
         os.makedirs(self._upload_dir, exist_ok=True)
 
-        # Generate unique filename
+        # Generate unique filename (timestamp + random suffix = collision-proof)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_name = f"{prefix}_{timestamp}.{ext}"
+        uid = uuid.uuid4().hex[:6]
+        safe_name = f"{prefix}_{timestamp}_{uid}.{ext}"
         filepath = os.path.join(self._upload_dir, safe_name)
 
         # Save

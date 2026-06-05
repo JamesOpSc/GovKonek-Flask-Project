@@ -13,6 +13,7 @@ REFACTORED for testability:
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
+from file_upload import get_upload_helper
 
 
 def _get_services():
@@ -50,12 +51,19 @@ def create_routes(app):
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
-        """Registration page and form handler."""
+        """
+        Registration page and form handler.
+
+        GET  → renders the registration form
+        POST → validates form data, creates user, redirects to login
+        """
         if request.method == 'POST':
+            # Extract form fields
             username = request.form['username']
             password = request.form['password']
             role = request.form['role']
 
+            # Delegate to AuthService for validation and user creation
             svc = _get_services()
             success, message = svc['auth'].register_user(username, password, role)
 
@@ -69,7 +77,14 @@ def create_routes(app):
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
-        """Login page and form handler."""
+        """
+        Login page and form handler.
+
+        GET  → renders the login form
+        POST → authenticates credentials, redirects based on user role:
+                - publisher → barangay_landing (their barangay's page)
+                - citizen   → dashboard (the main feed)
+        """
         if request.method == 'POST':
             username = request.form['username']
             password = request.form['password']
@@ -78,13 +93,15 @@ def create_routes(app):
             success, user = svc['auth'].authenticate_user(username, password)
 
             if success:
+                # Flask-Login: create session for authenticated user
                 login_user(user)
 
-                # Redirect publishers to their barangay landing page
+                # Role-based redirect after login
+                # Publishers are sent to their barangay landing page
                 if user.role == 'publisher':
                     return redirect(url_for('barangay_landing'))
 
-                # All other users go to dashboard
+                # All other users go to the main dashboard
                 return redirect(url_for('dashboard'))
             else:
                 flash('Invalid username or password.', 'error')
@@ -94,12 +111,19 @@ def create_routes(app):
     @app.route('/dashboard')
     @login_required
     def dashboard():
-        """Dashboard page - accessible only to authenticated users."""
+        """
+        Dashboard page — the main feed view after login.
+
+        Loads the current user's profile data and checks if a publisher
+        has already created their barangay page (used for onboarding prompts).
+        """
         svc = _get_services()
+
+        # Fetch user profile data (email, address, profile picture, etc.)
         user_data = svc['user_repo'].find_by_id(current_user.id)
         profile_pic = user_data['profile_picture'] if user_data else ''
 
-        # Check if publisher already has a barangay
+        # For publishers: check if they've set up their barangay page yet
         barangay = None
         has_barangay = False
         if current_user.role == 'publisher':
@@ -209,21 +233,14 @@ def create_routes(app):
             content = data.get('content', '') if data else ''
             category = data.get('category', 'Announcement') if data else 'Announcement'
 
-        # Handle image upload
+        # Handle image upload using centralized FileUploadHelper (OOP Abstraction)
         image_path = ''
         uploaded_image = request.files.get('image') if request.files else None
         if uploaded_image and uploaded_image.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_image.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"post_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_image.save(filepath)
-            image_path = f'/static/uploads/{safe_name}'
+            try:
+                image_path = get_upload_helper().save(uploaded_image, prefix='post')
+            except ValueError:
+                pass  # Invalid file type — silently skip image
 
         svc = _get_services()
         post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
@@ -395,13 +412,14 @@ def create_routes(app):
     @login_required
     def barangay_profile(publisher_id):
         """
-        Barangay profile page — shows a publisher's barangay info, projects,
-        announcements, and transparency documents in one view.
+        Barangay profile page — aggregates a publisher's barangay info,
+        projects, announcements, and transparency documents in one view.
 
         Clicking a publisher name on any post in the feed navigates here.
         """
         svc = _get_services()
-        # Get publisher info
+
+        # Look up the publisher's user record
         publisher = svc['user_repo'].find_by_id(publisher_id)
         if not publisher or publisher['role'] != 'publisher':
             flash('Barangay not found.', 'error')
@@ -410,16 +428,12 @@ def create_routes(app):
         # Get the barangay record for this publisher (if they created one)
         barangay = svc['barangay_repo'].get_by_publisher(publisher_id)
 
-        # Get publisher's projects
+        # Gather all content associated with this publisher
         projects = svc['project_repo'].get_by_publisher(publisher_id)
-
-        # Get publisher's posts (announcements / transparency)
         posts = svc['post_repo'].get_posts_by_publisher(publisher_id)
-
-        # Get all documents (documents table doesn't have publisher_id yet)
         documents = svc['document_repo'].get_all()
 
-        # Determine if current user is the owner
+        # Determine if the viewing user is the owner of this barangay
         is_owner = (current_user.role == 'publisher' and
                     current_user.id == publisher_id)
 
@@ -557,20 +571,15 @@ def create_routes(app):
         phone_number = request.form.get('phone_number', '').strip()
         profile_picture_path = ''
 
-        # Handle profile picture upload
+        # Handle profile picture upload using centralized FileUploadHelper
         uploaded_file = request.files.get('profile_picture')
         if uploaded_file and uploaded_file.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"profile_{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_file.save(filepath)
-            profile_picture_path = f'/static/uploads/{safe_name}'
+            try:
+                profile_picture_path = get_upload_helper().save(
+                    uploaded_file, prefix=f'profile_{current_user.id}'
+                )
+            except ValueError:
+                profile_picture_path = ''  # Invalid file type — skip
 
         user_repo.update_profile(
             current_user.id,
@@ -627,11 +636,16 @@ def create_routes(app):
     def api_get_weather():
         """
         API: Get live weather data for given coordinates using Open-Meteo.
+
+        Uses the free Open-Meteo API (no API key required) to fetch:
+          - Current: temperature, humidity, wind speed, weather code
+          - Daily forecast: 7-day min/max temps, precipitation probability
+
         Query params: lat (float), lon (float)
-        Returns: temperature, weather code, humidity, wind speed, and forecast.
         """
         import requests
 
+        # Parse and validate coordinate parameters
         lat = request.args.get('lat', type=float)
         lon = request.args.get('lon', type=float)
 
@@ -639,7 +653,8 @@ def create_routes(app):
             return jsonify({'error': 'lat and lon query parameters are required'}), 400
 
         try:
-            # Open-Meteo API (free, no API key required)
+            # Build the Open-Meteo API URL with current + daily forecast data
+            # Open-Meteo is free and doesn't require an API key
             weather_url = (
                 'https://api.open-meteo.com/v1/forecast'
                 f'?latitude={lat}&longitude={lon}'
@@ -648,9 +663,10 @@ def create_routes(app):
                 '&timezone=auto'
             )
             resp = requests.get(weather_url, timeout=10)
-            resp.raise_for_status()
+            resp.raise_for_status()  # Raise HTTPError for 4xx/5xx responses
             data = resp.json()
 
+            # Extract current conditions and daily forecast from response
             current = data.get('current', {})
             daily = data.get('daily', {})
 
@@ -674,6 +690,7 @@ def create_routes(app):
                 },
             })
         except requests.exceptions.RequestException as e:
+            # Network errors, DNS failures, timeouts, etc.
             return jsonify({'error': f'Weather service unavailable: {str(e)}'}), 502
 
     # ================================================================

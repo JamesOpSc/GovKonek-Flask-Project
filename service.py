@@ -24,7 +24,10 @@ from repository import (
     DocumentRepository, VoiceRepository, BarangayRepository
 )
 from models import create_user_from_db
-from exceptions import ValidationError, RequiredFieldError, InvalidValueError
+from exceptions import (
+    RequiredFieldError,
+    PermissionDeniedError
+)
 
 
 # ===========================================================================
@@ -95,7 +98,6 @@ class BaseService(ABC):
         @param user: User object with can_publish() method
         @raises PermissionDeniedError: if user is not a publisher
         """
-        from exceptions import PermissionDeniedError
         if not user.can_publish():
             raise PermissionDeniedError('perform this action', user.role)
 
@@ -125,29 +127,49 @@ class AuthService(BaseService):
 
     def register_user(self, username, password, role):
         """
-        Register a new user. Returns (success: bool, message: str).
+        Register a new user account.
 
-        EXCEPTION HANDLING: Uses _require() from BaseService for validation.
+        Validates required fields, checks for duplicate usernames,
+        hashes the password with werkzeug, and persists the user.
+
+        @param username: Desired login name (must be unique)
+        @param password: Plain-text password (hashed before storage)
+        @param role: User role — 'citizen' or 'publisher'
+        @return: (success: bool, message: str)
         """
         try:
+            # Validate all required fields are non-empty
             self._require(username, 'Username')
             self._require(password, 'Password')
             self._require(role, 'Role')
         except RequiredFieldError as e:
             return False, str(e)
 
+        # Check if username is already taken
         if self._user_repo.find_by_username(username):
             return False, "Username already exists. Try another one."
 
+        # Hash the password for secure storage (never store plain text!)
         hashed_password = generate_password_hash(password)
         if self._user_repo.create(username, hashed_password, role):
             return True, "Registration successful! Please log in."
         return False, "Registration failed"
 
     def authenticate_user(self, username, password):
-        """Authenticate a user. Returns (success: bool, user: User or None)."""
+        """
+        Authenticate a user by username and password.
+
+        Looks up the user in the database, then uses werkzeug's
+        check_password_hash to compare the provided password against
+        the stored hash.
+
+        @param username: Login name
+        @param password: Plain-text password to verify
+        @return: (success: bool, user: User or None)
+        """
         user_data = self._user_repo.find_by_username(username)
         if user_data and check_password_hash(user_data['password_hash'], password):
+            # Convert raw DB row to a User domain object via factory
             user = create_user_from_db(user_data)
             return True, user
         return False, None
@@ -177,12 +199,33 @@ class PostService(BaseService):
     # -- feed / detail ----------------------------------------------------
 
     def get_feed(self, search=None, category=None, sort=None):
-        """Get published posts with optional search, category filter, and sorting."""
+        """
+        Get published posts for the main feed.
+
+        Supports optional filtering by search query and category,
+        and sorting by newest, oldest, or title.
+
+        @param search: Text to search in title and content
+        @param category: Filter by post category (Announcement, Emergency, Health, Project)
+        @param sort: Sort order — 'newest', 'oldest', 'title'
+        @return: List of post dicts
+        """
         posts = self._post_repo.get_all_posts(search=search, category=category, sort=sort)
         return [dict(p) for p in posts]
 
     def get_post_detail(self, post_id, user_id=None):
-        """Get a single post with comments, reaction counts, and user's reaction."""
+        """
+        Get a single post with its comments, reaction counts, and user's reaction.
+
+        This aggregates data from three related tables:
+          - posts (the announcement itself)
+          - comments (user discussion)
+          - reactions (emoji counts + current user's reaction)
+
+        @param post_id: Post's primary key
+        @param user_id: Current user's ID (to check their reaction)
+        @return: Dict with 'post', 'comments', 'reaction_counts', 'user_reaction', or None
+        """
         post = self._post_repo.get_post_by_id(post_id)
         if not post:
             return None
@@ -196,7 +239,14 @@ class PostService(BaseService):
     # -- comments ---------------------------------------------------------
 
     def add_comment(self, post_id, user_id, content):
-        """Add a comment. Returns (comment_dict, error)."""
+        """
+        Add a comment to an announcement post.
+
+        @param post_id: Post's primary key
+        @param user_id: Comment author's user ID
+        @param content: Comment text (required, non-empty)
+        @return: (comment_dict, error) — error is None on success
+        """
         try:
             self._require(content, 'Comment')
         except RequiredFieldError as e:
@@ -207,14 +257,28 @@ class PostService(BaseService):
     # -- reactions --------------------------------------------------------
 
     def toggle_reaction(self, post_id, user_id, emoji):
-        """Toggle a reaction. Returns (result_dict, error)."""
+        """
+        Toggle an emoji reaction on a post.
+
+        Each user can have exactly ONE reaction per post:
+          - Clicking the same emoji again → removes it
+          - Clicking a different emoji    → changes to the new emoji
+          - No existing reaction          → adds the new emoji
+
+        @param post_id: Post's primary key
+        @param user_id: Reacting user's ID
+        @param emoji: Emoji character (must be in ALLOWED_EMOJI set)
+        @return: (result_dict, error) — result includes action, counts, and user's reaction
+        """
         if emoji not in self.ALLOWED_EMOJI:
             return None, f"Invalid emoji. Use: {', '.join(sorted(self.ALLOWED_EMOJI))}"
         action, _ = self._post_repo.toggle_reaction(post_id, user_id, emoji)
+
+        # Re-fetch fresh counts after mutation
         reaction_counts = [dict(r) for r in self._post_repo.get_reactions_for_post(post_id)]
         user_reaction = self._post_repo.get_user_reaction(post_id, user_id)
         return {
-            'action': action,
+            'action': action,          # 'added', 'removed', or 'changed'
             'reaction_counts': reaction_counts,
             'user_reaction': user_reaction,
         }, None
@@ -226,7 +290,6 @@ class PostService(BaseService):
         Create a new post. ONLY publisher (barangay captain) can publish.
         Returns (post_dict, error).
         """
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -243,7 +306,6 @@ class PostService(BaseService):
 
     def update_post(self, user, post_id, title, content):
         """Update a post. ONLY the publisher who created it can edit."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -256,7 +318,6 @@ class PostService(BaseService):
 
     def delete_post(self, user, post_id):
         """Delete a post. ONLY the publisher who created it can delete."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
         except PermissionDeniedError as e:
@@ -290,12 +351,26 @@ class VoiceService(BaseService):
     # -- voice posts -----------------------------------------------------
 
     def get_posts(self, category=None, status=None, search=None, sort=None):
-        """Get all voice posts, optionally filtered and sorted."""
+        """
+        Get all Citizens' Voice posts with optional filters.
+
+        @param category: Filter by category (Grievance, Suggestion, etc.)
+        @param status: Filter by status (open, resolved, closed)
+        @param search: Search in title AND author username
+        @param sort: Sort order — 'newest', 'oldest', 'most_voted', 'most_commented'
+        @return: List of voice post dicts
+        """
         return self._repo.get_all(category=category, status=status,
                                   search=search, sort=sort)
 
     def get_post_detail(self, voice_post_id, user_id=None):
-        """Get a voice post with comments and user's vote."""
+        """
+        Get a single voice post with its comments and the current user's vote.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Current user's ID (to check their vote)
+        @return: Dict with 'post', 'comments', 'user_vote', or None if not found
+        """
         post = self._repo.get_by_id(voice_post_id)
         if not post:
             return None
@@ -306,7 +381,15 @@ class VoiceService(BaseService):
         }
 
     def create_post(self, user_id, title, content, category='General'):
-        """Create a new voice post. Returns (post_dict, error)."""
+        """
+        Create a new Citizens' Voice post. Any authenticated user can post.
+
+        @param user_id: Author's user ID
+        @param title: Post title (required)
+        @param content: Post body (required)
+        @param category: Category (defaults to 'General')
+        @return: (post_dict, error)
+        """
         try:
             self._require(title, 'Title')
             self._require(content, 'Content')
@@ -317,21 +400,47 @@ class VoiceService(BaseService):
         return (post, None) if post else (None, "Failed to create post.")
 
     def update_status(self, voice_post_id, status):
-        """Update a voice post's status. Returns (success, error)."""
+        """
+        Update a voice post's status.
+
+        Typically called by a publisher to mark a grievance as 'resolved'
+        or 'closed' after addressing it.
+
+        @param voice_post_id: Voice post's primary key
+        @param status: New status — 'open', 'resolved', or 'closed'
+        @return: (success: bool, error)
+        """
         if status not in self.VALID_STATUSES:
             return False, f"Invalid status. Must be one of: {', '.join(self.VALID_STATUSES)}"
         self._repo.update_status(voice_post_id, status)
         return True, None
 
     def delete_post(self, voice_post_id, user_id):
-        """Delete a voice post. Only the original author can delete."""
+        """
+        Delete a voice post. Only the original author can delete.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Author's user ID (for authorization)
+        @return: (success: bool, error)
+        """
         self._repo.delete(voice_post_id, user_id)
         return True, None
 
     # -- comments --------------------------------------------------------
 
     def add_comment(self, voice_post_id, user_id, content, role):
-        """Add a comment. Publisher comments are marked official."""
+        """
+        Add a comment to a voice post.
+
+        If the commenter is a publisher (barangay captain), the comment
+        is automatically flagged as an official response for distinct UI styling.
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Comment author's user ID
+        @param content: Comment text
+        @param role: Author's role ('citizen' or 'publisher')
+        @return: (comment_dict, error)
+        """
         try:
             self._require(content, 'Comment')
         except RequiredFieldError as e:
@@ -343,7 +452,19 @@ class VoiceService(BaseService):
     # -- votes -----------------------------------------------------------
 
     def toggle_vote(self, voice_post_id, user_id, vote_type):
-        """Toggle up/down vote. Returns (result_dict, error)."""
+        """
+        Toggle an up/down vote on a voice post.
+
+        Each user gets ONE vote per post:
+          - Same vote type again → removes vote
+          - Different vote type    → changes vote
+          - No existing vote       → adds vote
+
+        @param voice_post_id: Voice post's primary key
+        @param user_id: Voting user's ID
+        @param vote_type: 'up' or 'down'
+        @return: (result_dict, error) — result includes action, net_change, user_vote
+        """
         if vote_type not in ('up', 'down'):
             return None, "Vote must be 'up' or 'down'."
         action, delta = self._repo.toggle_vote(voice_post_id, user_id, vote_type)
@@ -382,11 +503,20 @@ class ProjectService(BaseService):
     # -- read ------------------------------------------------------------
 
     def get_all(self):
-        """Get all projects, newest first."""
+        """
+        Get all barangay projects, newest first.
+
+        @return: List of project dicts
+        """
         return self._repo.get_all()
 
     def get_by_id(self, project_id):
-        """Get a single project by ID."""
+        """
+        Get a single project by its ID.
+
+        @param project_id: Project's primary key
+        @return: Project dict or None if not found
+        """
         return self._repo.get_by_id(project_id)
 
     # -- publisher-only mutations ----------------------------------------
@@ -395,8 +525,25 @@ class ProjectService(BaseService):
                        budget=0, location='', image_url='',
                        start_date='', end_date='',
                        latitude=None, longitude=None):
-        """Create a new project. ONLY publisher can create."""
-        from exceptions import PermissionDeniedError
+        """
+        Create a new barangay project. ONLY publisher can create.
+
+        Validates required fields, checks publisher authorization,
+        validates the date range (end >= start), and persists.
+
+        @param user: Current user (must be publisher)
+        @param title: Project name (required)
+        @param description: Detailed description (required)
+        @param status: 'ongoing', 'completed', or 'planned'
+        @param budget: Budget amount in PHP
+        @param location: Physical location of the project
+        @param image_url: Relative URL of project image
+        @param start_date: Start date (YYYY-MM-DD)
+        @param end_date: Expected completion date (YYYY-MM-DD)
+        @param latitude: GPS latitude for map marker
+        @param longitude: GPS longitude for map marker
+        @return: (project_dict, error)
+        """
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -425,8 +572,23 @@ class ProjectService(BaseService):
     def update_project(self, user, project_id, title, description, status,
                        budget, location, image_url, start_date, end_date,
                        latitude=None, longitude=None):
-        """Update a project. ONLY the publisher who created it can edit."""
-        from exceptions import PermissionDeniedError
+        """
+        Update an existing project. ONLY the publisher who created it can edit.
+
+        @param user: Current user (must be publisher)
+        @param project_id: Project's primary key
+        @param title: Updated title (required)
+        @param description: Updated description (required)
+        @param status: Updated status
+        @param budget: Updated budget
+        @param location: Updated location
+        @param image_url: Updated image URL
+        @param start_date: Updated start date
+        @param end_date: Updated end date
+        @param latitude: Updated GPS latitude
+        @param longitude: Updated GPS longitude
+        @return: (project_dict, error)
+        """
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -452,8 +614,13 @@ class ProjectService(BaseService):
         return (project, None) if project else (None, "Project not found or you are not authorized to edit it.")
 
     def delete_project(self, user, project_id):
-        """Delete a project. ONLY the publisher who created it can delete."""
-        from exceptions import PermissionDeniedError
+        """
+        Delete a project. ONLY the publisher who created it can delete.
+
+        @param user: Current user (must be publisher)
+        @param project_id: Project's primary key
+        @return: (success: bool, error)
+        """
         try:
             self._check_publisher(user)
         except PermissionDeniedError as e:
@@ -497,19 +664,39 @@ class DocumentService(BaseService):
     # -- read (all users) ------------------------------------------------
 
     def get_all(self):
-        """Get all documents, newest first."""
+        """
+        Get all transparency documents, newest first.
+
+        Accessible to all authenticated users (both citizens and publishers).
+
+        @return: List of document dicts
+        """
         return self._repo.get_all()
 
     def get_by_category(self, category):
-        """Get documents filtered by category."""
+        """
+        Get documents filtered by category.
+
+        @param category: Category name (e.g., 'Budget Report', 'Audit Report')
+        @return: List of document dicts in the given category
+        """
         return self._repo.get_by_category(category)
 
     def get_categories(self):
-        """Get distinct document categories."""
+        """
+        Get distinct document categories.
+
+        @return: List of category strings
+        """
         return self._repo.get_categories()
 
     def get_by_id(self, document_id):
-        """Get a single document by ID."""
+        """
+        Get a single document by its ID.
+
+        @param document_id: Document's primary key
+        @return: Document dict or None if not found
+        """
         return self._repo.get_by_id(document_id)
 
     # -- file validation -------------------------------------------------
@@ -545,10 +732,11 @@ class DocumentService(BaseService):
         """
         Save an uploaded file with a unique name to prevent overwrites.
 
-        Uses a timestamp prefix to avoid filename collisions.
+        Uses a timestamp prefix (YYYYMMDD_HHMMSS) to avoid filename collisions
+        when multiple users upload files with the same name.
 
-        @param file: Flask FileStorage object
-        @param filename: Original filename
+        @param file: Flask FileStorage object (already validated)
+        @param filename: Original filename from the user
         @return: Relative URL path to the saved file (e.g., '/static/uploads/20260604_abc_report.pdf')
         """
         import os
@@ -556,17 +744,18 @@ class DocumentService(BaseService):
 
         upload_folder = self._config.upload_folder if self._config else 'static/uploads'
 
-        # Ensure upload directory exists
+        # Ensure the upload directory exists (create if not)
         os.makedirs(upload_folder, exist_ok=True)
 
         # Generate unique filename: timestamp_originalname
+        # Example: 20260604_143052_Q1_Budget_Report.pdf
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         safe_name = f"{timestamp}_{filename}"
 
         filepath = os.path.join(upload_folder, safe_name)
         file.save(filepath)
 
-        # Return the relative URL for storage in the database
+        # Return the relative URL for storage in the database and serving
         return f'/static/uploads/{safe_name}'
 
     # -- publisher-only mutations ----------------------------------------
@@ -575,38 +764,47 @@ class DocumentService(BaseService):
         """
         Upload a new transparency document. ONLY publisher can upload.
 
-        POLYMORPHISM: Uses user.can_publish() — same method name as
-        PostService.create_post() and ProjectService.create_project().
+        Full workflow:
+          1. Check publisher authorization via user.can_publish()
+          2. Validate required fields (title)
+          3. Validate the uploaded file (extension check)
+          4. Calculate and format file size for display
+          5. Save the file to disk with a unique name
+          6. Create the database record with file metadata
 
         @param user: Current user (must be publisher)
         @param title: Document title
         @param description: Document description
-        @param category: Document category
+        @param category: Document category (Budget Report, Audit Report, etc.)
         @param file: Flask FileStorage object (the uploaded file)
-        @param published_date: Publication date string (YYYY-MM-DD)
+        @param published_date: Publication date string (YYYY-MM-DD), defaults to today
         @return: (document_dict, error)
         """
+        # Authorization: only barangay captains can upload documents
         if not user.can_publish():
             return None, "Only the Barangay Captain can upload documents."
 
+        # Validation: title is required
         if not title or not title.strip():
             return None, "Title is required."
 
+        # Default invalid categories to 'General'
         if category not in self.VALID_CATEGORIES:
             category = 'General'
 
-        # Validate and save file
+        # Validate file exists and has an allowed extension
         filename, error = self._validate_file(file)
         if error:
             return None, error
 
-        # Get file size
+        # Calculate file size for display in the UI
         import os
-        file.seek(0, os.SEEK_END)
+        file.seek(0, os.SEEK_END)  # Move to end to get total size
         file_size_bytes = file.tell()
-        file.seek(0)  # Reset for saving
+        file.seek(0)  # Reset to beginning so .save() works correctly
 
-        # Format file size for display
+        # Format file size for human-readable display
+        # Uses binary thresholds: < 1024 B, < 1024 KB, >= 1024 KB → MB
         if file_size_bytes < 1024:
             file_size = f"{file_size_bytes} B"
         elif file_size_bytes < 1024 * 1024:
@@ -614,15 +812,15 @@ class DocumentService(BaseService):
         else:
             file_size = f"{file_size_bytes / (1024 * 1024):.1f} MB"
 
-        # Save file to disk
+        # Save file to disk (returns relative URL like /static/uploads/20260604_report.pdf)
         file_url = self._save_file(file, filename)
 
-        # Use today's date if none provided
+        # Use today's date if the publisher didn't specify one
         if not published_date:
             from datetime import date
             published_date = date.today().isoformat()
 
-        # Create database record
+        # Persist document metadata to the database
         doc = self._repo.create(
             title=title.strip(),
             description=description.strip(),
@@ -638,7 +836,11 @@ class DocumentService(BaseService):
         """
         Delete a transparency document. ONLY publisher can delete.
 
-        Also removes the file from disk to free up storage.
+        Performs two cleanup steps:
+          1. Removes the file from disk (if it exists)
+          2. Removes the database record
+
+        This two-step approach prevents orphaned files on disk.
 
         @param user: Current user (must be publisher)
         @param document_id: ID of the document to delete
@@ -646,29 +848,32 @@ class DocumentService(BaseService):
         """
         import os
 
+        # Authorization check
         if not user.can_publish():
             return False, "Only the Barangay Captain can delete documents."
 
-        # Get the document to find its file path
+        # Look up the document to get its file path
         doc = self._repo.get_by_id(document_id)
         if not doc:
             return False, "Document not found."
 
-        # Delete the file from disk
+        # Step 1: Delete the physical file from disk
         file_url = doc.get('file_url', '')
         if file_url and file_url != '#':
             # Convert relative URL (e.g., /static/uploads/report.pdf)
-            # to absolute filesystem path
-            # __file__ is service.py → dirname is the project root
+            # to an absolute filesystem path.
+            # __file__ is service.py → dirname(__file__) is the project root
             project_root = os.path.dirname(os.path.abspath(__file__))
             file_path = os.path.join(project_root, file_url.lstrip('/'))
             try:
                 if os.path.exists(file_path):
                     os.remove(file_path)
             except OSError:
-                pass  # File already gone or permission issue — not critical
+                # File already deleted or permission issue — non-critical,
+                # proceed with database cleanup anyway
+                pass
 
-        # Delete from database
+        # Step 2: Delete the database record
         self._repo.delete(document_id, user.id)
         return True, None
 
@@ -696,19 +901,37 @@ class BarangayService(BaseService):
     # -- read (all users) ------------------------------------------------
 
     def get_all(self):
-        """Get all barangays."""
+        """
+        Get all barangays.
+
+        @return: List of barangay dicts
+        """
         return self._repo.get_all()
 
     def get_by_id(self, barangay_id):
-        """Get a single barangay by ID."""
+        """
+        Get a single barangay by its ID.
+
+        @param barangay_id: Barangay's primary key
+        @return: Barangay dict or None if not found
+        """
         return self._repo.get_by_id(barangay_id)
 
     def get_by_publisher(self, publisher_id):
-        """Get the barangay managed by a specific publisher."""
+        """
+        Get the barangay managed by a specific publisher.
+
+        @param publisher_id: Publisher's user ID
+        @return: Barangay dict or None
+        """
         return self._repo.get_by_publisher(publisher_id)
 
     def get_first(self):
-        """Get the default/first barangay."""
+        """
+        Get the default/first barangay (fallback for generic landing page).
+
+        @return: Barangay dict or None
+        """
         return self._repo.get_first()
 
     # -- publisher-only mutations ----------------------------------------
@@ -721,7 +944,22 @@ class BarangayService(BaseService):
         """
         Create a new barangay landing page. ONLY publisher can create.
 
-        Returns (barangay_dict, error).
+        Each publisher can manage exactly ONE barangay. If they already
+        have one, they must edit it instead of creating a new one.
+
+        @param user: Current user (must be publisher)
+        @param name: Barangay name (required)
+        @param description: Brief description of the barangay
+        @param address: Full physical address (required)
+        @param phone: Contact phone number
+        @param email: Official email address
+        @param facebook: Facebook page URL or handle
+        @param office_hours_weekday: Weekday office hours display string
+        @param office_hours_saturday: Saturday office hours display string
+        @param motto: Barangay motto/tagline
+        @param latitude: GPS latitude for map pin (default: Payatas, QC)
+        @param longitude: GPS longitude for map pin (default: Payatas, QC)
+        @return: (barangay_dict, error)
         """
         if not user.can_publish():
             return None, "Only the Barangay Captain can create a barangay page."
@@ -755,7 +993,13 @@ class BarangayService(BaseService):
         """
         Update a barangay's landing-page info. ONLY the owning publisher.
 
-        Returns (barangay_dict, error).
+        Only the fields provided in **fields are updated — others are left
+        unchanged (partial update / PATCH semantics).
+
+        @param user: Current user (must be publisher who owns the barangay)
+        @param barangay_id: Barangay's primary key
+        @param fields: Keyword args for fields to update (name, description, etc.)
+        @return: (barangay_dict, error)
         """
         if not user.can_publish():
             return None, "Only the Barangay Captain can edit the barangay page."
@@ -771,9 +1015,14 @@ class BarangayService(BaseService):
 
     def delete_barangay(self, user, barangay_id):
         """
-        Delete a barangay page. ONLY the owning publisher.
+        Delete a barangay page. ONLY the owning publisher can delete.
 
-        Returns (success: bool, error).
+        Verifies both that the user is a publisher AND that they own
+        the specific barangay being deleted.
+
+        @param user: Current user (must be the owning publisher)
+        @param barangay_id: Barangay's primary key
+        @return: (success: bool, error)
         """
         if not user.can_publish():
             return False, "Only the Barangay Captain can delete the barangay page."
