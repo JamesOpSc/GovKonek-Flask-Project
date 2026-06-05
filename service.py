@@ -6,42 +6,135 @@ Purpose: Service layer orchestrates business logic without being tied to Flask.
 Benefits: Easy to test, easy to reuse in different contexts (CLI, API, etc.)
 Keeps routes thin and focused on HTTP handling.
 
+OOP PRINCIPLES DEMONSTRATED:
+    - INHERITANCE: All services extend BaseService (like Vehicle → Car/Truck)
+    - ABSTRACTION: BaseService provides shared validation helpers
+    - ENCAPSULATION: Repositories are private (_repo), injected via constructor
+    - EXCEPTION HANDLING: ValidationError raised for invalid inputs
+
 REFACTORED for testability:
     - Services accept repository instances via constructor (dependency injection).
     - In tests, inject mock repositories to isolate business logic from the database.
-    - Static methods kept as backward-compatible wrappers around a default instance.
 """
 
+from abc import ABC
 from werkzeug.security import generate_password_hash, check_password_hash
-from repository import UserRepository, PostRepository
+from repository import (
+    UserRepository, PostRepository, ProjectRepository,
+    DocumentRepository, VoiceRepository, BarangayRepository
+)
 from models import create_user_from_db
+from exceptions import ValidationError, RequiredFieldError, InvalidValueError
 
 
 # ===========================================================================
+# BaseService — Abstract Base for All Services
+# ===========================================================================
+
+class BaseService(ABC):
+    """
+    Abstract base class for all service classes.
+
+    INHERITANCE (from lecture): Just like Vehicle is the base for Car/Truck,
+    BaseService is the base for AuthService, PostService, ProjectService, etc.
+
+    Provides common validation helpers so subclasses don't duplicate:
+      - Required field checks
+      - Allowed-value validation
+      - Publisher-only authorization checks
+
+    Benefits:
+      - DRY: Validation logic defined ONCE
+      - CONSISTENT: All services use the same validation patterns
+      - TESTABLE: Each helper is isolated and easy to unit-test
+      - EXTENSIBLE: New service types just extend BaseService
+    """
+
+    # ------------------------------------------------------------------
+    # Validation Helpers (shared by all subclasses)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _require(value, field_name):
+        """
+        Validate that a required field is non-empty.
+
+        EXCEPTION HANDLING: Raises RequiredFieldError with a clear message
+        instead of letting the caller check manually.
+
+        @param value: The value to check (str or None)
+        @param field_name: Human-readable field name for the error message
+        @raises RequiredFieldError: if value is None or empty after stripping
+        """
+        if not value or not str(value).strip():
+            raise RequiredFieldError(field_name)
+
+    @staticmethod
+    def _validate_choice(value, field_name, allowed):
+        """
+        Validate that a value is in a set of allowed choices.
+
+        @param value: The value to validate
+        @param field_name: Human-readable field name
+        @param allowed: Iterable of allowed values
+        @raises InvalidValueError: if value is not in allowed set
+        @return: The value if valid (or the first allowed value as default)
+        """
+        if value not in allowed:
+            # Default to first allowed value instead of raising
+            return list(allowed)[0] if allowed else value
+        return value
+
+    @staticmethod
+    def _check_publisher(user):
+        """
+        POLYMORPHISM: Check if a user can publish (delegates to user.can_publish()).
+
+        Raises PermissionDeniedError if the user lacks publisher rights.
+
+        @param user: User object with can_publish() method
+        @raises PermissionDeniedError: if user is not a publisher
+        """
+        from exceptions import PermissionDeniedError
+        if not user.can_publish():
+            raise PermissionDeniedError('perform this action', user.role)
+
+    @staticmethod
+    def _sanitize(value):
+        """Strip whitespace from a string value. Returns empty string for None."""
+        return str(value).strip() if value else ''
 # AuthService
 # ===========================================================================
 
-class AuthService:
+class AuthService(BaseService):
     """
     Authentication and authorization business logic.
 
-    REFACTORED: Now instance-based. Pass a UserRepository to the constructor.
-    For testing, inject a mock or an in-memory repository.
+    INHERITANCE: Extends BaseService — inherits validation helpers.
+
+    For testing, inject a mock or in-memory UserRepository.
     """
 
     def __init__(self, user_repo=None):
         """
-        @param user_repo: UserRepository instance.
-                          Defaults to a new UserRepository() if not provided.
+        @param user_repo: UserRepository instance (injected, not lazy-imported).
         """
         self._user_repo = user_repo or UserRepository()
 
     # -- public API -------------------------------------------------------
 
     def register_user(self, username, password, role):
-        """Register a new user. Returns (success: bool, message: str)."""
-        if not username or not password or not role:
-            return False, "All fields are required"
+        """
+        Register a new user. Returns (success: bool, message: str).
+
+        EXCEPTION HANDLING: Uses _require() from BaseService for validation.
+        """
+        try:
+            self._require(username, 'Username')
+            self._require(password, 'Password')
+            self._require(role, 'Role')
+        except RequiredFieldError as e:
+            return False, str(e)
 
         if self._user_repo.find_by_username(username):
             return False, "Username already exists. Try another one."
@@ -59,30 +152,25 @@ class AuthService:
             return True, user
         return False, None
 
-    # AuthService: no static wrappers needed — routes use injected instances.
-    # If external code needs a default instance, create one:
-    #     from repository import UserRepository
-    #     auth = AuthService(UserRepository())
-
 
 # ===========================================================================
 # PostService
 # ===========================================================================
 
-class PostService:
+class PostService(BaseService):
     """
     Post, comment, and reaction business logic.
 
-    REFACTORED: Now instance-based. Pass a PostRepository to the constructor.
-    For testing, inject a mock repository.
+    INHERITANCE: Extends BaseService — inherits _require, _validate_choice,
+    _check_publisher, and _sanitize helpers.
     """
 
     ALLOWED_EMOJI = {'👍', '❤️', '😄', '😢', '😡', '🎉'}
+    VALID_CATEGORIES = ['Announcement', 'Emergency', 'Health', 'Project']
 
     def __init__(self, post_repo=None):
         """
-        @param post_repo: PostRepository instance.
-                          Defaults to a new PostRepository() if not provided.
+        @param post_repo: PostRepository instance (injected).
         """
         self._post_repo = post_repo or PostRepository()
 
@@ -98,7 +186,6 @@ class PostService:
         post = self._post_repo.get_post_by_id(post_id)
         if not post:
             return None
-
         return {
             'post': dict(post),
             'comments': [dict(c) for c in self._post_repo.get_comments_for_post(post_id)],
@@ -110,9 +197,11 @@ class PostService:
 
     def add_comment(self, post_id, user_id, content):
         """Add a comment. Returns (comment_dict, error)."""
-        if not content or not content.strip():
-            return None, "Comment cannot be empty."
-        comment = self._post_repo.add_comment(post_id, user_id, content.strip())
+        try:
+            self._require(content, 'Comment')
+        except RequiredFieldError as e:
+            return None, str(e)
+        comment = self._post_repo.add_comment(post_id, user_id, self._sanitize(content))
         return dict(comment), None
 
     # -- reactions --------------------------------------------------------
@@ -120,12 +209,10 @@ class PostService:
     def toggle_reaction(self, post_id, user_id, emoji):
         """Toggle a reaction. Returns (result_dict, error)."""
         if emoji not in self.ALLOWED_EMOJI:
-            return None, "Invalid emoji."
-
+            return None, f"Invalid emoji. Use: {', '.join(sorted(self.ALLOWED_EMOJI))}"
         action, _ = self._post_repo.toggle_reaction(post_id, user_id, emoji)
         reaction_counts = [dict(r) for r in self._post_repo.get_reactions_for_post(post_id)]
         user_reaction = self._post_repo.get_user_reaction(post_id, user_id)
-
         return {
             'action': action,
             'reaction_counts': reaction_counts,
@@ -137,64 +224,56 @@ class PostService:
     def create_post(self, user, title, content, category='Announcement', image_path=''):
         """
         Create a new post. ONLY publisher (barangay captain) can publish.
-        Supports optional image attachment.
-
         Returns (post_dict, error).
         """
-        if not user.can_publish():
-            return None, "Only the Barangay Captain can publish announcements."
-        if not title or not title.strip():
-            return None, "Title is required."
-        if not content or not content.strip():
-            return None, "Content is required."
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+            self._require(title, 'Title')
+            self._require(content, 'Content')
+        except (PermissionDeniedError, RequiredFieldError) as e:
+            return None, str(e)
 
-        # Validate category
-        valid_categories = ['Announcement', 'Emergency', 'Health', 'Project']
-        if category not in valid_categories:
-            category = 'Announcement'
-
+        category = self._validate_choice(category, 'category', self.VALID_CATEGORIES)
         post = self._post_repo.create_post(
-            user.id, title.strip(), content.strip(), category,
-            image_path=image_path
+            user.id, self._sanitize(title), self._sanitize(content),
+            category, image_path=image_path
         )
         return (post, None) if post else (None, "Failed to create post.")
 
     def update_post(self, user, post_id, title, content):
-        """
-        Update a post. ONLY the publisher who created it can edit.
-        Returns (post_dict, error).
-        """
-        if not user.can_publish():
-            return None, "Only the Barangay Captain can edit announcements."
-        if not title or not title.strip():
-            return None, "Title is required."
-        if not content or not content.strip():
-            return None, "Content is required."
+        """Update a post. ONLY the publisher who created it can edit."""
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+            self._require(title, 'Title')
+            self._require(content, 'Content')
+        except (PermissionDeniedError, RequiredFieldError) as e:
+            return None, str(e)
 
-        post = self._post_repo.update_post(post_id, user.id, title.strip(), content.strip())
+        post = self._post_repo.update_post(post_id, user.id, self._sanitize(title), self._sanitize(content))
         return (post, None) if post else (None, "Post not found or you are not authorized to edit it.")
 
     def delete_post(self, user, post_id):
-        """
-        Delete a post. ONLY the publisher who created it can delete.
-        Returns (success: bool, error).
-        """
-        if not user.can_publish():
-            return False, "Only the Barangay Captain can delete announcements."
+        """Delete a post. ONLY the publisher who created it can delete."""
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+        except PermissionDeniedError as e:
+            return False, str(e)
         self._post_repo.delete_post(post_id, user.id)
         return True, None
-
-    # PostService: no static wrappers needed — routes use injected instances.
 
 
 # ===========================================================================
 # VoiceService — Citizens' Voice forum business logic
 # ===========================================================================
 
-class VoiceService:
+class VoiceService(BaseService):
     """
     Business logic for the Citizens' Voice forum.
 
+    INHERITANCE: Extends BaseService.
     Any authenticated user can post topics, comment, and vote.
     Publisher (barangay captain) comments are flagged as official responses.
     """
@@ -204,15 +283,14 @@ class VoiceService:
 
     def __init__(self, voice_repo=None):
         """
-        @param voice_repo: VoiceRepository instance.
+        @param voice_repo: VoiceRepository instance (injected).
         """
-        from repository import VoiceRepository
         self._repo = voice_repo or VoiceRepository()
 
     # -- voice posts -----------------------------------------------------
 
     def get_posts(self, category=None, status=None, search=None, sort=None):
-        """Get all voice posts, optionally filtered by category, status, title/author search, and sorted."""
+        """Get all voice posts, optionally filtered and sorted."""
         return self._repo.get_all(category=category, status=status,
                                   search=search, sort=sort)
 
@@ -229,13 +307,13 @@ class VoiceService:
 
     def create_post(self, user_id, title, content, category='General'):
         """Create a new voice post. Returns (post_dict, error)."""
-        if not title or not title.strip():
-            return None, "Title is required."
-        if not content or not content.strip():
-            return None, "Content is required."
-        if category not in self.CATEGORIES:
-            category = 'General'
-        post = self._repo.create(user_id, title.strip(), content.strip(), category)
+        try:
+            self._require(title, 'Title')
+            self._require(content, 'Content')
+        except RequiredFieldError as e:
+            return None, str(e)
+        category = self._validate_choice(category, 'category', self.CATEGORIES)
+        post = self._repo.create(user_id, self._sanitize(title), self._sanitize(content), category)
         return (post, None) if post else (None, "Failed to create post.")
 
     def update_status(self, voice_post_id, status):
@@ -246,18 +324,20 @@ class VoiceService:
         return True, None
 
     def delete_post(self, voice_post_id, user_id):
-        """Delete a voice post. Only the original author can delete. Returns (success, error)."""
+        """Delete a voice post. Only the original author can delete."""
         self._repo.delete(voice_post_id, user_id)
         return True, None
 
     # -- comments --------------------------------------------------------
 
     def add_comment(self, voice_post_id, user_id, content, role):
-        """Add a comment. Publisher comments are marked official. Returns (comment_dict, error)."""
-        if not content or not content.strip():
-            return None, "Comment cannot be empty."
+        """Add a comment. Publisher comments are marked official."""
+        try:
+            self._require(content, 'Comment')
+        except RequiredFieldError as e:
+            return None, str(e)
         is_official = (role == 'publisher')
-        comment = self._repo.add_comment(voice_post_id, user_id, content.strip(), is_official)
+        comment = self._repo.add_comment(voice_post_id, user_id, self._sanitize(content), is_official)
         return (comment, None) if comment else (None, "Failed to add comment.")
 
     # -- votes -----------------------------------------------------------
@@ -283,21 +363,20 @@ class VoiceService:
 # ProjectService — Barangay Projects business logic
 # ===========================================================================
 
-class ProjectService:
+class ProjectService(BaseService):
     """
     Business logic for Barangay Projects.
 
+    INHERITANCE: Extends BaseService.
     Only publisher (barangay captain) can create, update, or delete projects.
-    All users can view projects.
     """
 
     VALID_STATUSES = ['ongoing', 'completed', 'planned']
 
     def __init__(self, project_repo=None):
         """
-        @param project_repo: ProjectRepository instance.
+        @param project_repo: ProjectRepository instance (injected).
         """
-        from repository import ProjectRepository
         self._repo = project_repo or ProjectRepository()
 
     # -- read ------------------------------------------------------------
@@ -316,81 +395,69 @@ class ProjectService:
                        budget=0, location='', image_url='',
                        start_date='', end_date='',
                        latitude=None, longitude=None):
-        """
-        Create a new project. ONLY publisher (barangay captain) can create.
-        Returns (project_dict, error).
-        """
-        if not user.can_publish():
-            return None, "Only the Barangay Captain can create projects."
-        if not title or not title.strip():
-            return None, "Title is required."
-        if not description or not description.strip():
-            return None, "Description is required."
-        if status not in self.VALID_STATUSES:
-            status = 'ongoing'
+        """Create a new project. ONLY publisher can create."""
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+            self._require(title, 'Title')
+            self._require(description, 'Description')
+        except (PermissionDeniedError, RequiredFieldError) as e:
+            return None, str(e)
 
-        # Validate date range: end date must not be before start date
+        status = self._validate_choice(status, 'status', self.VALID_STATUSES)
+
+        # Validate date range
         if start_date and end_date and end_date < start_date:
             return None, "End date cannot be before start date."
 
         project = self._repo.create(
-            title=title.strip(),
-            description=description.strip(),
-            status=status,
-            budget=budget,
-            location=location.strip(),
-            image_url=image_url.strip(),
-            start_date=start_date,
-            end_date=end_date,
+            title=self._sanitize(title),
+            description=self._sanitize(description),
+            status=status, budget=budget,
+            location=self._sanitize(location),
+            image_url=self._sanitize(image_url),
+            start_date=start_date, end_date=end_date,
             publisher_id=user.id,
-            latitude=latitude,
-            longitude=longitude
+            latitude=latitude, longitude=longitude
         )
         return (project, None) if project else (None, "Failed to create project.")
 
     def update_project(self, user, project_id, title, description, status,
                        budget, location, image_url, start_date, end_date,
                        latitude=None, longitude=None):
-        """
-        Update a project. ONLY the publisher who created it can edit.
-        Returns (project_dict, error).
-        """
-        if not user.can_publish():
-            return None, "Only the Barangay Captain can edit projects."
-        if not title or not title.strip():
-            return None, "Title is required."
-        if not description or not description.strip():
-            return None, "Description is required."
-        if status not in self.VALID_STATUSES:
-            status = 'ongoing'
+        """Update a project. ONLY the publisher who created it can edit."""
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+            self._require(title, 'Title')
+            self._require(description, 'Description')
+        except (PermissionDeniedError, RequiredFieldError) as e:
+            return None, str(e)
 
-        # Validate date range: end date must not be before start date
+        status = self._validate_choice(status, 'status', self.VALID_STATUSES)
+
         if start_date and end_date and end_date < start_date:
             return None, "End date cannot be before start date."
 
         project = self._repo.update(
-            project_id=project_id,
-            publisher_id=user.id,
-            title=title.strip(),
-            description=description.strip(),
-            status=status,
-            budget=budget,
-            location=location.strip(),
-            image_url=image_url.strip(),
-            start_date=start_date,
-            end_date=end_date,
-            latitude=latitude,
-            longitude=longitude
+            project_id=project_id, publisher_id=user.id,
+            title=self._sanitize(title),
+            description=self._sanitize(description),
+            status=status, budget=budget,
+            location=self._sanitize(location),
+            image_url=self._sanitize(image_url),
+            start_date=start_date, end_date=end_date,
+            latitude=latitude, longitude=longitude
         )
         return (project, None) if project else (None, "Project not found or you are not authorized to edit it.")
 
     def delete_project(self, user, project_id):
-        """
-        Delete a project. ONLY the publisher who created it can delete.
-        Returns (success: bool, error).
-        """
-        if not user.can_publish():
-            return False, "Only the Barangay Captain can delete projects."
+        """Delete a project. ONLY the publisher who created it can delete."""
+        from exceptions import PermissionDeniedError
+        try:
+            self._check_publisher(user)
+        except PermissionDeniedError as e:
+            return False, str(e)
         self._repo.delete(project_id, user.id)
         return True, None
 
@@ -399,9 +466,11 @@ class ProjectService:
 # DocumentService — Transparency Documents business logic
 # ===========================================================================
 
-class DocumentService:
+class DocumentService(BaseService):
     """
     Business logic for Transparency Documents.
+
+    INHERITANCE: Extends BaseService.
 
     Only publisher (barangay captain) can upload, update, or delete documents.
     All users can view and download documents.
@@ -419,10 +488,9 @@ class DocumentService:
 
     def __init__(self, document_repo=None, config=None):
         """
-        @param document_repo: DocumentRepository instance
+        @param document_repo: DocumentRepository instance (injected)
         @param config: Config instance (for upload_folder and allowed_extensions)
         """
-        from repository import DocumentRepository
         self._repo = document_repo or DocumentRepository()
         self._config = config
 
@@ -602,4 +670,119 @@ class DocumentService:
 
         # Delete from database
         self._repo.delete(document_id, user.id)
+        return True, None
+
+
+# ===========================================================================
+# BarangayService — Barangay landing-page business logic
+# ===========================================================================
+
+class BarangayService(BaseService):
+    """
+    Business logic for managing barangay landing-page configuration.
+
+    INHERITANCE: Extends BaseService.
+
+    Publishers can create and edit their barangay's public landing page.
+    All users can view any barangay's landing page.
+    """
+
+    def __init__(self, barangay_repo=None):
+        """
+        @param barangay_repo: BarangayRepository instance (injected).
+        """
+        self._repo = barangay_repo or BarangayRepository()
+
+    # -- read (all users) ------------------------------------------------
+
+    def get_all(self):
+        """Get all barangays."""
+        return self._repo.get_all()
+
+    def get_by_id(self, barangay_id):
+        """Get a single barangay by ID."""
+        return self._repo.get_by_id(barangay_id)
+
+    def get_by_publisher(self, publisher_id):
+        """Get the barangay managed by a specific publisher."""
+        return self._repo.get_by_publisher(publisher_id)
+
+    def get_first(self):
+        """Get the default/first barangay."""
+        return self._repo.get_first()
+
+    # -- publisher-only mutations ----------------------------------------
+
+    def create_barangay(self, user, name, description='', address='',
+                        phone='', email='', facebook='',
+                        office_hours_weekday='8:00 AM – 5:00 PM',
+                        office_hours_saturday='8:00 AM – 12:00 PM',
+                        motto='', latitude=14.71309, longitude=121.10063):
+        """
+        Create a new barangay landing page. ONLY publisher can create.
+
+        Returns (barangay_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can create a barangay page."
+        if not name or not name.strip():
+            return None, "Barangay name is required."
+        if not address or not address.strip():
+            return None, "Barangay address is required."
+
+        # Check if publisher already manages a barangay
+        existing = self._repo.get_by_publisher(user.id)
+        if existing:
+            return None, "You already manage a barangay. Edit it instead."
+
+        barangay = self._repo.create(
+            name=name.strip(),
+            description=description.strip() if description else '',
+            address=address.strip() if address else '',
+            phone=phone.strip() if phone else '',
+            email=email.strip() if email else '',
+            facebook=facebook.strip() if facebook else '',
+            office_hours_weekday=office_hours_weekday,
+            office_hours_saturday=office_hours_saturday,
+            motto=motto.strip() if motto else '',
+            latitude=latitude,
+            longitude=longitude,
+            publisher_id=user.id
+        )
+        return (barangay, None) if barangay else (None, "Failed to create barangay page.")
+
+    def update_barangay(self, user, barangay_id, **fields):
+        """
+        Update a barangay's landing-page info. ONLY the owning publisher.
+
+        Returns (barangay_dict, error).
+        """
+        if not user.can_publish():
+            return None, "Only the Barangay Captain can edit the barangay page."
+
+        barangay = self._repo.get_by_id(barangay_id)
+        if not barangay:
+            return None, "Barangay not found."
+        if barangay.get('publisher_id') != user.id:
+            return None, "You are not authorized to edit this barangay."
+
+        updated = self._repo.update(barangay_id, user.id, **fields)
+        return (updated, None) if updated else (None, "Failed to update barangay page.")
+
+    def delete_barangay(self, user, barangay_id):
+        """
+        Delete a barangay page. ONLY the owning publisher.
+
+        Returns (success: bool, error).
+        """
+        if not user.can_publish():
+            return False, "Only the Barangay Captain can delete the barangay page."
+
+        barangay = self._repo.get_by_id(barangay_id)
+        if not barangay:
+            return False, "Barangay not found."
+        if barangay.get('publisher_id') != user.id:
+            return False, "You are not authorized to delete this barangay."
+
+        self._repo.delete(barangay_id, user.id)
         return True, None
