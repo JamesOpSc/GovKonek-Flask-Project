@@ -887,3 +887,67 @@ class BarangayRepository(BaseRepository):
             (barangay_id, publisher_id)
         )
         return True
+
+
+# ===========================================================================
+# OfficialRepository — Barangay officials management
+# ===========================================================================
+
+class OfficialRepository(BaseRepository):
+    """
+    Repository for barangay officials (captain, kagawads, secretary, etc.).
+
+    INHERITANCE: Extends BaseRepository.
+    """
+
+    def get_by_barangay(self, barangay_id):
+        """Fetch all officials for a barangay, ordered by rank."""
+        return [dict(o) for o in self._execute(
+            'SELECT * FROM officials WHERE barangay_id = ? ORDER BY rank_order ASC',
+            (barangay_id,), fetch='all'
+        )]
+
+    def get_by_id(self, official_id):
+        """Fetch a single official by ID."""
+        row = self._execute(
+            'SELECT * FROM officials WHERE id = ?', (official_id,), fetch='one'
+        )
+        return dict(row) if row else None
+
+    def create(self, barangay_id, name, position, rank_order=0):
+        """Add a new official to a barangay. Returns the created official."""
+        cursor = self._execute_write(
+            'INSERT INTO officials (barangay_id, name, position, rank_order) VALUES (?, ?, ?, ?)',
+            (barangay_id, name, position, rank_order)
+        )
+        return self.get_by_id(cursor.lastrowid)
+
+    def update(self, official_id, **fields):
+        """Update an official's info."""
+        allowed = ['name', 'position', 'rank_order']
+        set_clauses = []
+        params = []
+        for key in allowed:
+            if key in fields:
+                set_clauses.append(f'{key} = ?')
+                params.append(fields[key])
+        if not set_clauses:
+            return self.get_by_id(official_id)
+        params.append(official_id)
+        self._execute_write(
+            f"UPDATE officials SET {', '.join(set_clauses)} WHERE id = ?",
+            tuple(params)
+        )
+        return self.get_by_id(official_id)
+
+    def delete(self, official_id):
+        """Remove an official."""
+        self._execute_write('DELETE FROM officials WHERE id = ?', (official_id,))
+        return True
+
+    def delete_all_for_barangay(self, barangay_id):
+        """Remove all officials for a barangay (useful for bulk replace)."""
+        self._execute_write(
+            'DELETE FROM officials WHERE barangay_id = ?', (barangay_id,)
+        )
+        return True

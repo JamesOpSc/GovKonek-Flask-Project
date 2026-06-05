@@ -599,6 +599,294 @@
 </div>
 
 <!-- ═══════════════════════════════════════════ -->
+<!-- BARANGAY OFFICIALS                         -->
+<!-- ═══════════════════════════════════════════ -->
+<style>
+    .officials-section {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        padding: 28px;
+        margin-top: 24px;
+    }
+    .officials-section h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+        border-bottom: 2px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .officials-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+    }
+    .official-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #fafbfc;
+        transition: all 0.2s;
+        position: relative;
+    }
+    .official-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .official-card.captain {
+        border-left: 4px solid #0056b3;
+        background: #f0f7ff;
+    }
+    .official-avatar {
+        width: 44px; height: 44px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #0056b3, #3b82f6);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .official-card.captain .official-avatar {
+        background: linear-gradient(135deg, #0056b3, #004085);
+        font-size: 20px;
+    }
+    .official-info { flex: 1; min-width: 0; }
+    .official-info .off-name {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .official-info .off-position {
+        font-size: 11px;
+        color: #64748b;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .official-card.captain .off-position { color: #0056b3; font-weight: 600; }
+
+    /* Publisher management controls */
+    .official-actions {
+        display: none;
+        gap: 4px;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+    }
+    .is-owner .official-actions { display: flex; }
+    .off-btn {
+        width: 26px; height: 26px;
+        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        background: #fff;
+        cursor: pointer;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+    }
+    .off-btn:hover { background: #f1f5f9; }
+    .off-btn.del:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+    .off-btn.edit:hover { background: #eff6ff; color: #0056b3; border-color: #bfdbfe; }
+
+    .add-official-btn {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        margin-top: 16px;
+        padding: 10px 18px;
+        border: 2px dashed #cbd5e1;
+        border-radius: 10px;
+        background: transparent;
+        color: #64748b;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .add-official-btn:hover {
+        border-color: #0056b3;
+        color: #0056b3;
+        background: #f0f7ff;
+    }
+    .is-owner .add-official-btn { display: inline-flex; }
+
+    /* Inline add/edit form */
+    .official-form-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+    }
+    .official-form-row input {
+        padding: 8px 12px;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: 'Inter', sans-serif;
+        flex: 1;
+        min-width: 120px;
+    }
+    .official-form-row input:focus { border-color: #0056b3; outline: none; }
+    .off-save-btn {
+        padding: 8px 16px;
+        background: #0056b3;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 13px;
+    }
+    .off-cancel-btn {
+        padding: 8px 14px;
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 13px;
+    }
+    .empty-officials {
+        text-align: center;
+        padding: 24px;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+</style>
+
+<div class="officials-section {{ 'is-owner' if is_owner else '' }}" id="officialsSection">
+    <h3>👥 Barangay Officials</h3>
+
+    {% if officials %}
+    <div class="officials-grid" id="officialsGrid">
+        {% for off in officials %}
+        <div class="official-card {{ 'captain' if off.rank_order == 1 else '' }}" data-id="{{ off.id }}">
+            <div class="official-avatar">{{ off.name[:2] | upper }}</div>
+            <div class="official-info">
+                <div class="off-name">{{ off.name }}</div>
+                <div class="off-position">{{ off.position }}</div>
+            </div>
+            {% if is_owner %}
+            <div class="official-actions">
+                <button class="off-btn edit" title="Edit" onclick="editOfficial({{ off.id }}, '{{ off.name | e }}', '{{ off.position | e }}', {{ off.rank_order }})">✏️</button>
+                <button class="off-btn del" title="Remove" onclick="deleteOfficial({{ off.id }})">✕</button>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-officials" id="emptyOfficials">No officials listed yet.</div>
+    <div class="officials-grid" id="officialsGrid" style="display:none;"></div>
+    {% endif %}
+
+    {% if is_owner %}
+    <button class="add-official-btn" onclick="showAddOfficialForm()">＋ Add Official</button>
+    <div id="officialFormRow" style="display:none;"></div>
+    {% endif %}
+</div>
+
+{% if is_owner %}
+<script>
+    let editingOfficialId = null;
+    const barangayId = {{ barangay.id if barangay else 'null' }};
+
+    function showAddOfficialForm() {
+        editingOfficialId = null;
+        const row = document.getElementById('officialFormRow');
+        row.style.display = 'flex';
+        row.innerHTML = `
+            <input type="text" id="offName" placeholder="Full name" style="flex:2;">
+            <input type="text" id="offPosition" placeholder="Position (e.g. Barangay Kagawad)" style="flex:2;">
+            <input type="number" id="offRank" placeholder="Rank #" style="flex:0.5;min-width:70px;" value="99">
+            <button class="off-save-btn" onclick="saveOfficial()">💾 Add</button>
+            <button class="off-cancel-btn" onclick="cancelOfficialForm()">Cancel</button>
+        `;
+    }
+
+    function editOfficial(id, name, position, rank) {
+        editingOfficialId = id;
+        const row = document.getElementById('officialFormRow');
+        row.style.display = 'flex';
+        row.innerHTML = `
+            <input type="text" id="offName" placeholder="Full name" value="${escapeHtml(name)}" style="flex:2;">
+            <input type="text" id="offPosition" placeholder="Position" value="${escapeHtml(position)}" style="flex:2;">
+            <input type="number" id="offRank" placeholder="Rank #" value="${rank}" style="flex:0.5;min-width:70px;">
+            <button class="off-save-btn" onclick="saveOfficial()">💾 Update</button>
+            <button class="off-cancel-btn" onclick="cancelOfficialForm()">Cancel</button>
+        `;
+    }
+
+    function cancelOfficialForm() {
+        document.getElementById('officialFormRow').style.display = 'none';
+        editingOfficialId = null;
+    }
+
+    async function saveOfficial() {
+        const name = document.getElementById('offName').value.trim();
+        const position = document.getElementById('offPosition').value.trim();
+        const rank = parseInt(document.getElementById('offRank').value) || 99;
+        if (!name || !position) { alert('Name and position are required.'); return; }
+
+        const url = editingOfficialId
+            ? `/api/officials/${editingOfficialId}`
+            : `/api/barangays/${barangayId}/officials`;
+        const method = editingOfficialId ? 'PUT' : 'POST';
+
+        try {
+            const resp = await fetch(url, {
+                method, headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ name, position, rank_order: rank })
+            });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                const r = await resp.json();
+                alert(r.error || 'Failed to save.');
+            }
+        } catch(e) { alert('Network error.'); }
+    }
+
+    async function deleteOfficial(id) {
+        if (!confirm('Remove this official?')) return;
+        try {
+            const resp = await fetch(`/api/officials/${id}`, { method: 'DELETE' });
+            if (resp.ok) { window.location.reload(); }
+            else { const r = await resp.json(); alert(r.error || 'Failed to delete.'); }
+        } catch(e) { alert('Network error.'); }
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+</script>
+{% endif %}
+
+<!-- ═══════════════════════════════════════════ -->
 <!-- EDIT / CREATE BARANGAY FORM (publisher)    -->
 <!-- ═══════════════════════════════════════════ -->
 {% if role == 'publisher' %}

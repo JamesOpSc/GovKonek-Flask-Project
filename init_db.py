@@ -244,6 +244,42 @@ def create_database():
             121.10063
         ))
 
+    # -- Barangay Officials ------------------------------------------------
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS officials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            barangay_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            position TEXT NOT NULL,
+            rank_order INTEGER DEFAULT 0,
+            image TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (barangay_id) REFERENCES barangays(id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Seed default officials for the first barangay if none exist
+    cursor.execute('SELECT COUNT(*) FROM officials')
+    if cursor.fetchone()[0] == 0:
+        default_officials = [
+            ('Juan Dela Cruz', 'Punong Barangay (Barangay Captain)', 1),
+            ('Maria Santos', 'Barangay Kagawad (Councilor)', 2),
+            ('Jose Rizal', 'Barangay Kagawad (Councilor)', 3),
+            ('Ana Reyes', 'Barangay Kagawad (Councilor)', 4),
+            ('Pedro Gonzales', 'Barangay Kagawad (Councilor)', 5),
+            ('Sofia Mendoza', 'Barangay Kagawad (Councilor)', 6),
+            ('Luis Torres', 'Barangay Kagawad (Councilor)', 7),
+            ('Elena Cruz', 'Barangay Kagawad (Councilor)', 8),
+            ('Carlos Bautista', 'SK Chairperson', 9),
+            ('Teresa Villanueva', 'Barangay Secretary', 10),
+            ('Ramon Flores', 'Barangay Treasurer', 11),
+        ]
+        for name, position, rank in default_officials:
+            cursor.execute(
+                'INSERT INTO officials (barangay_id, name, position, rank_order) VALUES (1, ?, ?, ?)',
+                (name, position, rank)
+            )
+
     connection.commit()
     connection.close()
     print("Database and all tables created successfully!")
