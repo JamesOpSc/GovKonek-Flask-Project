@@ -74,6 +74,49 @@ def create_routes(app):
                 flash(message, 'error')
 
         return render_template('register.html')
+    
+    @app.route('/barangay/my-hub')
+    @login_required
+    def my_barangay_hub():
+        """Automatically resolves the logged-in user's neighborhood without throwing a 404."""
+        # Detect what your User object uses for its neighborhood string safely
+        user_b = getattr(current_user, 'barangay', None) or getattr(current_user, 'barangay_name', None) or 'Payatas'
+        
+        # Format it into a clean slug and redirect to the dynamic hub viewer
+        slug = user_b.lower().replace(' ', '-')
+        return redirect(f'/barangay/view/{slug}')
+
+
+    @app.route('/barangay/view/<barangay_slug>')
+    @login_required
+    def barangay_hub(barangay_slug):
+        """Displays any neighborhood requested by the URL slug."""
+        # 1. Convert "bagong-silangan" back to "Bagong Silangan"
+        clean_name = barangay_slug.replace('-', ' ').title()
+        
+        # 2. Open database connection to grab text configs
+        import sqlite3
+        conn = sqlite3.connect('govkonek.db')
+        conn.row_factory = sqlite3.Row
+        
+        details = conn.execute(
+            'SELECT * FROM barangays WHERE name = ?', (clean_name,)
+        ).fetchone()
+        
+        posts = conn.execute(
+            'SELECT * FROM announcements WHERE barangay_name = ? ORDER BY timestamp DESC', 
+            (clean_name,)
+        ).fetchall()
+        
+        conn.close()
+        
+        # 3. Pass everything into the HTML template!
+        return render_template(
+            'barangay_landing.html', 
+            barangay_name=clean_name,
+            details=details,
+            posts=posts
+        )
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():

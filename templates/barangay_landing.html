@@ -311,6 +311,23 @@
 <!-- ═══════════════════════════════════════════ -->
 <!-- HERO BANNER                                -->
 <!-- ═══════════════════════════════════════════ -->
+
+<div class="container mt-4">
+    <div class="jumbotron bg-light border p-5 rounded">
+        <h1 class="display-4 font-weight-bold">Barangay {{ barangay_name }}</h1>
+        <p class="lead text-muted">Official Local Government Unit Portal</p>
+        <hr class="my-4">
+        
+        <p class="font-size-lg">
+            {{ details.description if details else "Welcome to your local neighborhood command and communications center." }}
+        </p>
+        
+        {% if details %}
+            <span class="badge bg-info text-dark p-2">Estimated Population: {{ details.population }} Residents</span>
+        {% endif %}
+    </div>
+</div>
+
 <div class="landing-hero">
     <div class="landing-hero-content">
         <div class="hero-icon">🏛️</div>
