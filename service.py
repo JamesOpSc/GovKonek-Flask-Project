@@ -24,7 +24,10 @@ from repository import (
     DocumentRepository, VoiceRepository, BarangayRepository
 )
 from models import create_user_from_db
-from exceptions import ValidationError, RequiredFieldError, InvalidValueError
+from exceptions import (
+    ValidationError, RequiredFieldError, InvalidValueError,
+    PermissionDeniedError
+)
 
 
 # ===========================================================================
@@ -95,7 +98,6 @@ class BaseService(ABC):
         @param user: User object with can_publish() method
         @raises PermissionDeniedError: if user is not a publisher
         """
-        from exceptions import PermissionDeniedError
         if not user.can_publish():
             raise PermissionDeniedError('perform this action', user.role)
 
@@ -226,7 +228,6 @@ class PostService(BaseService):
         Create a new post. ONLY publisher (barangay captain) can publish.
         Returns (post_dict, error).
         """
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -243,7 +244,6 @@ class PostService(BaseService):
 
     def update_post(self, user, post_id, title, content):
         """Update a post. ONLY the publisher who created it can edit."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -256,7 +256,6 @@ class PostService(BaseService):
 
     def delete_post(self, user, post_id):
         """Delete a post. ONLY the publisher who created it can delete."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
         except PermissionDeniedError as e:
@@ -396,7 +395,6 @@ class ProjectService(BaseService):
                        start_date='', end_date='',
                        latitude=None, longitude=None):
         """Create a new project. ONLY publisher can create."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -426,7 +424,6 @@ class ProjectService(BaseService):
                        budget, location, image_url, start_date, end_date,
                        latitude=None, longitude=None):
         """Update a project. ONLY the publisher who created it can edit."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
             self._require(title, 'Title')
@@ -453,7 +450,6 @@ class ProjectService(BaseService):
 
     def delete_project(self, user, project_id):
         """Delete a project. ONLY the publisher who created it can delete."""
-        from exceptions import PermissionDeniedError
         try:
             self._check_publisher(user)
         except PermissionDeniedError as e:

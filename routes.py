@@ -13,6 +13,7 @@ REFACTORED for testability:
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
+from file_upload import get_upload_helper
 
 
 def _get_services():
@@ -209,21 +210,14 @@ def create_routes(app):
             content = data.get('content', '') if data else ''
             category = data.get('category', 'Announcement') if data else 'Announcement'
 
-        # Handle image upload
+        # Handle image upload using centralized FileUploadHelper (OOP Abstraction)
         image_path = ''
         uploaded_image = request.files.get('image') if request.files else None
         if uploaded_image and uploaded_image.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_image.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"post_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_image.save(filepath)
-            image_path = f'/static/uploads/{safe_name}'
+            try:
+                image_path = get_upload_helper().save(uploaded_image, prefix='post')
+            except ValueError:
+                pass  # Invalid file type — silently skip image
 
         svc = _get_services()
         post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
@@ -557,20 +551,15 @@ def create_routes(app):
         phone_number = request.form.get('phone_number', '').strip()
         profile_picture_path = ''
 
-        # Handle profile picture upload
+        # Handle profile picture upload using centralized FileUploadHelper
         uploaded_file = request.files.get('profile_picture')
         if uploaded_file and uploaded_file.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"profile_{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_file.save(filepath)
-            profile_picture_path = f'/static/uploads/{safe_name}'
+            try:
+                profile_picture_path = get_upload_helper().save(
+                    uploaded_file, prefix=f'profile_{current_user.id}'
+                )
+            except ValueError:
+                profile_picture_path = ''  # Invalid file type — skip
 
         user_repo.update_profile(
             current_user.id,
