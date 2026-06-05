@@ -302,7 +302,7 @@
 <!-- ================================================================= -->
 <div class="voice-header">
     <div>
-        <h2>🗣️ Citizens' Voice <span id="liveIndicator" style="font-size:12px;background:#22c55e;color:#fff;padding:3px 10px;border-radius:12px;font-weight:600;margin-left:10px;vertical-align:middle;display:none;">🟢 LIVE</span></h2>
+        <h2>🗣️ Citizens' Voice</h2>
         <p>Speak up. Be heard. Shape your community.</p>
     </div>
     <button class="btn-primary" onclick="openNewPostModal()">✏️ New Post</button>
@@ -382,22 +382,12 @@
     let selectedPostId = null;
     let allPosts = [];
     let searchTimeout = null;
-    let pollInterval = null;
-    let detailPollInterval = null;
-    let lastPostHash = '';
-    let lastDetailHash = '';
 
     // =====================================================================
     // INIT
     // =====================================================================
     document.addEventListener('DOMContentLoaded', () => {
         loadPosts();
-        startPolling();
-    });
-
-    // Clean up polling when leaving the page
-    window.addEventListener('beforeunload', () => {
-        stopPolling();
     });
 
     // =====================================================================
@@ -467,112 +457,10 @@
     }
 
     // =====================================================================
-    // REALTIME POLLING
-    // =====================================================================
-    function startPolling() {
-        stopPolling();
-        // Show live indicator
-        const liveEl = document.getElementById('liveIndicator');
-        if (liveEl) liveEl.style.display = 'inline';
-
-        // Poll post list every 10 seconds
-        pollInterval = setInterval(() => {
-            silentLoadPosts();
-        }, 10000);
-
-        // Poll detail every 5 seconds when a post is selected
-        detailPollInterval = setInterval(() => {
-            if (selectedPostId) silentRefreshDetail();
-        }, 5000);
-    }
-
-    function stopPolling() {
-        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-        if (detailPollInterval) { clearInterval(detailPollInterval); detailPollInterval = null; }
-        const liveEl = document.getElementById('liveIndicator');
-        if (liveEl) liveEl.style.display = 'none';
-    }
-
-    // -- Silent post list refresh (no spinner, preserves selection) ------
-    async function silentLoadPosts() {
-        try {
-            const search = document.getElementById('searchInput').value.trim();
-            const sort = document.getElementById('sortSelect').value;
-            const params = new URLSearchParams();
-            if (search) params.set('search', search);
-            if (sort && sort !== 'newest') params.set('sort', sort);
-            const qs = params.toString();
-            const url = '/api/voice' + (qs ? '?' + qs : '');
-            const resp = await fetch(url);
-            if (!resp.ok) return;
-            const data = await resp.json();
-            const newPosts = data.posts;
-
-            // Compute a hash to detect actual changes
-            const newHash = JSON.stringify(newPosts.map(p => ({
-                id: p.id, vote_count: p.vote_count, comment_count: p.comment_count,
-                status: p.status, title: p.title
-            })));
-            if (newHash === lastPostHash) return; // No changes
-            lastPostHash = newHash;
-
-            allPosts = newPosts;
-            const empty = document.getElementById('voiceEmpty');
-
-            if (allPosts.length === 0) {
-                document.getElementById('voiceList').innerHTML = '';
-                empty.style.display = 'block';
-            } else {
-                empty.style.display = 'none';
-                renderPostList(allPosts);
-            }
-        } catch (err) {
-            // Silent — don't show errors on poll
-        }
-    }
-
-    // -- Silent detail refresh (preserves comment input) -----------------
-    async function silentRefreshDetail() {
-        if (!selectedPostId) return;
-        try {
-            const resp = await fetch(`/api/voice/${selectedPostId}`);
-            if (!resp.ok) return;
-            const data = await resp.json();
-
-            // Compute hash to avoid unnecessary re-renders
-            const newHash = JSON.stringify({
-                vote_count: data.post.vote_count,
-                status: data.post.status,
-                comment_count: (data.comments || []).length,
-                user_vote: data.user_vote,
-                last_comment: data.comments && data.comments.length
-                    ? data.comments[data.comments.length - 1].id : 0
-            });
-            if (newHash === lastDetailHash) return;
-            lastDetailHash = newHash;
-
-            // Save comment input value before re-render
-            const commentInput = document.getElementById('commentInput');
-            const savedComment = commentInput ? commentInput.value : '';
-
-            renderDetail(data);
-
-            // Restore comment input value after re-render
-            const newInput = document.getElementById('commentInput');
-            if (newInput && savedComment) {
-                newInput.value = savedComment;
-            }
-        } catch (err) {
-            // Silent
-        }
-    }
-
-    // =====================================================================
     // SELECT POST & SHOW DETAIL
     // =====================================================================
-    async function selectPost(postId, silent = false) {
+    async function selectPost(postId) {
         selectedPostId = postId;
-        lastDetailHash = ''; // Reset hash so fresh data is always fetched
         // Update card highlights
         document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
         const card = document.getElementById('card-' + postId);
@@ -667,10 +555,10 @@
                 body: JSON.stringify({ vote_type: voteType })
             });
             if (!resp.ok) throw new Error('Vote failed');
-            // Silent refresh — no spinner flash
-            lastDetailHash = '';
-            silentRefreshDetail();
-            // Let the next poll cycle update the list count
+            // Reload the detail view
+            selectPost(postId);
+            // Also refresh the list to update vote count
+            loadPosts();
         } catch (err) {
             alert('Failed to vote. Please try again.');
         }
@@ -696,10 +584,8 @@
                 throw new Error(err.error || 'Failed to add comment');
             }
             input.value = '';
-            // Silent refresh — no spinner flash, preserves input state
-            lastDetailHash = '';
-            silentRefreshDetail();
-            // Let the next poll cycle update the list comment count
+            selectPost(postId);
+            loadPosts(); // refresh comment count
         } catch (err) {
             alert(err.message);
         }
@@ -715,10 +601,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
             });
-            lastPostHash = '';
-            lastDetailHash = '';
-            silentLoadPosts();
-            silentRefreshDetail();
+            loadPosts();
+            selectPost(postId);
         } catch (err) {
             alert('Failed to update status.');
         }
@@ -732,8 +616,6 @@
         try {
             await fetch(`/api/voice/${postId}`, { method: 'DELETE' });
             selectedPostId = null;
-            lastPostHash = '';
-            lastDetailHash = '';
             loadPosts();
             document.getElementById('voiceDetail').innerHTML = `
                 <div class="voice-detail-empty">

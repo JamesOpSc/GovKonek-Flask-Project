@@ -129,24 +129,98 @@
 </div>
 
 <div id="servicesContainer">
-    {% if grouped_services %}
-        {% for category, items in grouped_services.items() %}
-        <div class="category-section">
-            <div class="category-title">📂 {{ category }}</div>
-            <div class="service-grid">
-                {% for s in items %}
-                <a href="/services/{{ s.slug }}" class="service-card">
-                    <div class="service-icon">{{ s.icon or '📋' }}</div>
-                    <div class="service-name">{{ s.name }}</div>
-                    <div class="service-desc">{{ s.description }}</div>
-                    <span class="service-badge">🔗 View Details</span>
-                </a>
-                {% endfor %}
-            </div>
+    <!-- ============================================================ -->
+    <!-- HARDCODED SERVICES — removed DB dependency                   -->
+    <!-- ============================================================ -->
+
+    <!-- Certificates -->
+    <div class="category-section">
+        <div class="category-title">📂 Certificates</div>
+        <div class="service-grid">
+            <a href="/services/barangay-clearance" class="service-card">
+                <div class="service-icon">📋</div>
+                <div class="service-name">Barangay Clearance</div>
+                <div class="service-desc">Apply for and obtain your barangay clearance online. Required for employment, business permits, and other transactions.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+            <a href="/services/certificate-of-indigency" class="service-card">
+                <div class="service-icon">📜</div>
+                <div class="service-name">Certificate of Indigency</div>
+                <div class="service-desc">Request a Certificate of Indigency for medical assistance, scholarship applications, and other needs.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="empty-state">No services available at this time.</div>
-    {% endif %}
+    </div>
+
+    <!-- IDs & Registration -->
+    <div class="category-section">
+        <div class="category-title">📂 IDs &amp; Registration</div>
+        <div class="service-grid">
+            <a href="/services/barangay-id-application" class="service-card">
+                <div class="service-icon">🪪</div>
+                <div class="service-name">Barangay ID Application</div>
+                <div class="service-desc">Register for your official Barangay ID. Valid government-issued identification for residents.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Business -->
+    <div class="category-section">
+        <div class="category-title">📂 Business</div>
+        <div class="service-grid">
+            <a href="/services/business-permit-assistance" class="service-card">
+                <div class="service-icon">🏪</div>
+                <div class="service-name">Business Permit Assistance</div>
+                <div class="service-desc">Get help with processing your business permit requirements at the barangay level.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Public Safety -->
+    <div class="category-section">
+        <div class="category-title">📂 Public Safety</div>
+        <div class="service-grid">
+            <a href="/services/blotter-incident-report" class="service-card">
+                <div class="service-icon">🚨</div>
+                <div class="service-name">Blotter / Incident Report</div>
+                <div class="service-desc">File an official blotter report for incidents, disputes, or complaints within the barangay.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+            <a href="/services/grievance-filing" class="service-card">
+                <div class="service-icon">📝</div>
+                <div class="service-name">Grievance Filing</div>
+                <div class="service-desc">Submit a formal grievance or complaint to the Barangay Council for mediation and resolution.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Health -->
+    <div class="category-section">
+        <div class="category-title">📂 Health</div>
+        <div class="service-grid">
+            <a href="/services/health-center-appointment" class="service-card">
+                <div class="service-icon">🏥</div>
+                <div class="service-name">Health Center Appointment</div>
+                <div class="service-desc">Book an appointment at the Barangay Health Center for checkups, vaccinations, and consultations.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Social Services -->
+    <div class="category-section">
+        <div class="category-title">📂 Social Services</div>
+        <div class="service-grid">
+            <a href="/services/senior-citizen-benefits" class="service-card">
+                <div class="service-icon">👴</div>
+                <div class="service-name">Senior Citizen Benefits</div>
+                <div class="service-desc">Apply for senior citizen benefits, discounts, and social pension programs.</div>
+                <span class="service-badge">🔗 View Details</span>
+            </a>
+        </div>
+    </div>
 </div>
 {% endblock %}

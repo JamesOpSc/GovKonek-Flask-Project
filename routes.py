@@ -265,26 +265,10 @@ def create_routes(app):
     @app.route('/services')
     @login_required
     def e_services():
-        """E-Services page."""
-        svc = _get_services()
-        services = svc['service_repo'].get_all()
-        # Group by category for template rendering
-        grouped = {}
-        for s in services:
-            cat = s.get('category', 'General')
-            if cat not in grouped:
-                grouped[cat] = []
-            # Pre-compute slug for href
-            s_slug = s.get('name', '').lower()
-            # Simple slug: replace non-alphanumeric runs with hyphens
-            import re
-            s_slug = re.sub(r'[^a-z0-9]+', '-', s_slug).strip('-')
-            s['slug'] = s_slug
-            grouped[cat].append(s)
+        """E-Services page — services are hardcoded in the template."""
         return render_template('services.html',
                                name=current_user.username,
-                               role=current_user.role,
-                               grouped_services=grouped)
+                               role=current_user.role)
 
     @app.route('/services/<service_name>')
     @login_required
@@ -365,13 +349,10 @@ def create_routes(app):
         image_url = data.get('image_url', '') if data else ''
         start_date = data.get('start_date', '') if data else ''
         end_date = data.get('end_date', '') if data else ''
-        latitude = data.get('latitude') if data else None
-        longitude = data.get('longitude') if data else None
         svc = _get_services()
         project, error = svc['project_service'].create_project(
             current_user, title, description, status,
-            budget, location, image_url, start_date, end_date,
-            latitude, longitude
+            budget, location, image_url, start_date, end_date
         )
         if error:
             return jsonify({'error': error}), 403
@@ -390,13 +371,10 @@ def create_routes(app):
         image_url = data.get('image_url', '') if data else ''
         start_date = data.get('start_date', '') if data else ''
         end_date = data.get('end_date', '') if data else ''
-        latitude = data.get('latitude') if data else None
-        longitude = data.get('longitude') if data else None
         svc = _get_services()
         project, error = svc['project_service'].update_project(
             current_user, project_id, title, description, status,
-            budget, location, image_url, start_date, end_date,
-            latitude, longitude
+            budget, location, image_url, start_date, end_date
         )
         if error:
             return jsonify({'error': error}), 403
