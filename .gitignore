@@ -1,3 +1,10 @@
 venv/
 __pycache__/
 *.db
+tests/test_repository.py
+tests/test_models.py
+tests/test_exceptions.py
+tests/test_config.py
+tests/check_readme_flow.py
+tests/__init__.py
+tests/check_document_upload.py

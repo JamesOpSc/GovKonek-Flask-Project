@@ -134,9 +134,11 @@ class PostService:
 
     # -- publisher-only post management -----------------------------------
 
-    def create_post(self, user, title, content, category='Announcement'):
+    def create_post(self, user, title, content, category='Announcement', image_path=''):
         """
         Create a new post. ONLY publisher (barangay captain) can publish.
+        Supports optional image attachment.
+
         Returns (post_dict, error).
         """
         if not user.can_publish():
@@ -151,7 +153,10 @@ class PostService:
         if category not in valid_categories:
             category = 'Announcement'
 
-        post = self._post_repo.create_post(user.id, title.strip(), content.strip(), category)
+        post = self._post_repo.create_post(
+            user.id, title.strip(), content.strip(), category,
+            image_path=image_path
+        )
         return (post, None) if post else (None, "Failed to create post.")
 
     def update_post(self, user, post_id, title, content):

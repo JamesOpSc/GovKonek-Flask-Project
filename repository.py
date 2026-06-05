@@ -224,6 +224,17 @@ class UserRepository(BaseRepository):
         except DuplicateRecordError:
             return False
 
+    def update_profile(self, user_id, email='', address='', phone_number='',
+                       profile_picture=''):
+        """Update a user's profile fields. Returns the updated user row."""
+        self._execute_write(
+            '''UPDATE users
+               SET email = ?, address = ?, phone_number = ?, profile_picture = ?
+               WHERE id = ?''',
+            (email, address, phone_number, profile_picture, user_id)
+        )
+        return self.find_by_id(user_id)
+
     # -- backward-compatible static interface -----------------------------
 
     @staticmethod
@@ -246,11 +257,13 @@ class PostRepository(BaseRepository):
 
     # -- post CRUD --------------------------------------------------------
 
-    def create_post(self, publisher_id, title, content, category='Announcement', status='published'):
+    def create_post(self, publisher_id, title, content, category='Announcement',
+                     status='published', image_path=''):
         """Create a new post. Returns the created post as a dict."""
         cursor = self._execute_write(
-            'INSERT INTO posts (publisher_id, title, content, category, status) VALUES (?, ?, ?, ?, ?)',
-            (publisher_id, title, content, category, status)
+            '''INSERT INTO posts (publisher_id, title, content, category, status, image_path)
+               VALUES (?, ?, ?, ?, ?, ?)''',
+            (publisher_id, title, content, category, status, image_path)
         )
         post_id = cursor.lastrowid
         post = self._execute('''

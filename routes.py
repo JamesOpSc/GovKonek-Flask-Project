@@ -25,6 +25,7 @@ def _get_services():
         'auth': ext['auth_service'],
         'posts': ext['post_service'],
         'post_repo': ext['post_repo'],
+        'user_repo': ext['user_repo'],
         'project_repo': ext['project_repo'],
         'project_service': ext['project_service'],
         'service_repo': ext['service_repo'],
@@ -169,13 +170,41 @@ def create_routes(app):
     @app.route('/api/posts', methods=['POST'])
     @login_required
     def api_create_post():
-        """API: Create a new post. ONLY publisher (barangay captain) can create."""
-        data = request.get_json()
-        title = data.get('title', '') if data else ''
-        content = data.get('content', '') if data else ''
-        category = data.get('category', 'Announcement') if data else 'Announcement'
+        """
+        API: Create a new post. ONLY publisher (barangay captain) can create.
+
+        Accepts multipart/form-data (for image upload) or JSON.
+        Fields: title, content, category, image (optional file upload)
+        """
+        # Check if multipart or JSON
+        if request.content_type and 'multipart' in request.content_type:
+            title = request.form.get('title', '')
+            content = request.form.get('content', '')
+            category = request.form.get('category', 'Announcement')
+        else:
+            data = request.get_json()
+            title = data.get('title', '') if data else ''
+            content = data.get('content', '') if data else ''
+            category = data.get('category', 'Announcement') if data else 'Announcement'
+
+        # Handle image upload
+        image_path = ''
+        uploaded_image = request.files.get('image') if request.files else None
+        if uploaded_image and uploaded_image.filename:
+            import os
+            from datetime import datetime
+            upload_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
+            )
+            os.makedirs(upload_dir, exist_ok=True)
+            ext = uploaded_image.filename.rsplit('.', 1)[-1].lower()
+            safe_name = f"post_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+            filepath = os.path.join(upload_dir, safe_name)
+            uploaded_image.save(filepath)
+            image_path = f'/static/uploads/{safe_name}'
+
         svc = _get_services()
-        post, error = svc['posts'].create_post(current_user, title, content, category)
+        post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
         if error:
             return jsonify({'error': error}), 403
         return jsonify({'post': post}), 201
@@ -244,6 +273,26 @@ def create_routes(app):
         return render_template('documents.html',
                                name=current_user.username,
                                role=current_user.role)
+
+    @app.route('/post/<int:post_id>')
+    @login_required
+    def post_detail(post_id):
+        """
+        Individual post view — the "clickable post" from the Backend Guide.
+
+        Renders a full post with comments, reactions, and a "Discuss" / grievance
+        link for citizens to engage constructively with barangay announcements.
+        """
+        svc = _get_services()
+        detail = svc['posts'].get_post_detail(post_id, current_user.id)
+        if not detail:
+            flash('Post not found.', 'error')
+            return redirect(url_for('dashboard'))
+        return render_template('post_detail.html',
+                               post=detail,
+                               name=current_user.username,
+                               role=current_user.role,
+                               user_id=current_user.id)
 
     # ================================================================
     # FEATURE DATA APIs
@@ -336,6 +385,62 @@ def create_routes(app):
         repo = _get_services()['document_repo']
         documents = repo.get_all()
         return jsonify({'documents': documents})
+
+    # ================================================================
+    # USER PROFILE API
+    # ================================================================
+
+    @app.route('/api/profile', methods=['GET', 'POST'])
+    @login_required
+    def api_profile():
+        """
+        API: Get or update the current user's profile.
+
+        GET  → returns { profile: { email, address, phone_number, profile_picture } }
+        POST → updates profile with multipart/form-data (supports profile_picture upload)
+        """
+        user_repo = _get_services()['user_repo']
+
+        if request.method == 'GET':
+            user_data = user_repo.find_by_id(current_user.id)
+            if not user_data:
+                return jsonify({'error': 'User not found'}), 404
+            return jsonify({'profile': {
+                'email': user_data['email'] or '',
+                'address': user_data['address'] or '',
+                'phone_number': user_data['phone_number'] or '',
+                'profile_picture': user_data['profile_picture'] or '',
+            }})
+
+        # POST — update profile
+        email = request.form.get('email', '').strip()
+        address = request.form.get('address', '').strip()
+        phone_number = request.form.get('phone_number', '').strip()
+        profile_picture_path = ''
+
+        # Handle profile picture upload
+        uploaded_file = request.files.get('profile_picture')
+        if uploaded_file and uploaded_file.filename:
+            import os
+            from datetime import datetime
+            upload_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
+            )
+            os.makedirs(upload_dir, exist_ok=True)
+            ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
+            safe_name = f"profile_{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
+            filepath = os.path.join(upload_dir, safe_name)
+            uploaded_file.save(filepath)
+            profile_picture_path = f'/static/uploads/{safe_name}'
+
+        user_repo.update_profile(
+            current_user.id,
+            email=email,
+            address=address,
+            phone_number=phone_number,
+            profile_picture=profile_picture_path
+        )
+        return jsonify({'success': True, 'message': 'Profile updated!'})
 
     @app.route('/api/documents', methods=['POST'])
     @login_required

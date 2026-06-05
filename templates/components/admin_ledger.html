@@ -148,6 +148,9 @@
             </select>
             <label for="postContent">Content</label>
             <textarea id="postContent" placeholder="Write your announcement here..."></textarea>
+            <label for="postImage">Attach Image (optional)</label>
+            <input type="file" id="postImage" accept="image/*" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+            <div id="imagePreview" style="margin-top:6px;color:#0ea5e9;font-size:12px;"></div>
         </div>
         <div class="modal-footer">
             <button class="btn-cancel" onclick="closeModal()">Cancel</button>
@@ -229,6 +232,8 @@
         document.getElementById('postTitle').value = '';
         document.getElementById('postCategory').value = 'Announcement';
         document.getElementById('postContent').value = '';
+        document.getElementById('postImage').value = '';
+        document.getElementById('imagePreview').textContent = '';
         document.getElementById('btnSave').textContent = 'Publish';
         document.getElementById('postModal').classList.add('active');
     };
@@ -250,11 +255,13 @@
         editingPostId = null;
     };
 
-    // Save (create or update)
+    // Save (create or update) — supports image upload via multipart/form-data
     window.savePost = async function() {
         const title = document.getElementById('postTitle').value.trim();
         const content = document.getElementById('postContent').value.trim();
         const category = document.getElementById('postCategory').value;
+        const imageFile = document.getElementById('postImage').files[0];
+
         if (!title || !content) {
             showToast('Please fill in both title and content.', 'error');
             return;
@@ -267,16 +274,23 @@
         try {
             let res;
             if (editingPostId) {
+                // Update — use JSON (image upload on edit is separate concern)
                 res = await fetch(`/api/posts/${editingPostId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, content })
                 });
             } else {
+                // Create — use FormData for file upload support
+                const formData = new FormData();
+                formData.append('title', title);
+                formData.append('content', content);
+                formData.append('category', category);
+                if (imageFile) formData.append('image', imageFile);
+
                 res = await fetch('/api/posts', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content, category })
+                    body: formData  // DO NOT set Content-Type header — browser sets it with boundary
                 });
             }
             const data = await res.json();
@@ -286,6 +300,8 @@
                 showToast(editingPostId ? 'Announcement updated!' : 'Announcement published!', 'success');
                 closeModal();
                 loadLedger();
+                // Refresh feed if on dashboard
+                if (typeof loadFeed === 'function') loadFeed();
             }
         } catch (e) {
             showToast('Something went wrong. Please try again.', 'error');

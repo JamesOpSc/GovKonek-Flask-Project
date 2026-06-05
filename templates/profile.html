@@ -1,19 +1,105 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+<div style="max-width: 800px; margin: 0 auto;">
     
-    <div style="display: flex; align-items: center; gap: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 30px; margin-bottom: 30px;">
-        <div style="font-size: 80px; background: var(--background); width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">👤</div>
-        <div>
-            <h1 style="font-size: 32px; font-weight: 700; margin-bottom: 5px;">{{ name }}</h1>
-            <span style="background: #0ea5e9; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; text-transform: uppercase;">{{ role }}</span>
+    <!-- Profile Header -->
+    <div style="background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 30px; margin-bottom: 30px;">
+            <div id="profileAvatar" style="font-size: 80px; background: var(--background); width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0;">
+                👤
+            </div>
+            <div>
+                <h1 style="font-size: 32px; font-weight: 700; margin-bottom: 5px;">{{ name }}</h1>
+                <span style="background: #0ea5e9; color: white; padding: 4px 12px; border-radius: 20px; font-size: 14px; font-weight: 600; text-transform: uppercase;">{{ role }}</span>
+            </div>
         </div>
+
+        <!-- Profile Edit Form -->
+        <h3 style="font-size: 18px; margin-bottom: 20px; color: #0f172a;">📋 My Information</h3>
+        <form id="profileForm" style="display: flex; flex-direction: column; gap: 16px;">
+            <div>
+                <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Email Address</label>
+                <input type="email" id="profileEmail" name="email" placeholder="your@email.com"
+                    style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Address</label>
+                <input type="text" id="profileAddress" name="address" placeholder="Your complete address"
+                    style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Phone Number</label>
+                <input type="text" id="profilePhone" name="phone_number" placeholder="+63 9XX XXX XXXX"
+                    style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+            </div>
+            <div>
+                <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">Profile Picture</label>
+                <input type="file" id="profilePictureInput" accept="image/*"
+                    style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;">
+                <div id="picPreview" style="margin-top:8px;color:#0ea5e9;font-size:12px;"></div>
+            </div>
+            <button type="submit" class="btn" style="align-self:flex-start;margin-top:8px;">
+                💾 Save Profile
+            </button>
+        </form>
     </div>
 
-    <h3 style="font-size: 18px; margin-bottom: 15px; color: var(--text-muted);">Verified Citizen Information</h3>
-    <p>This is where you will eventually display the user's address, contact number, and uploaded government IDs.</p>
-    
-    <a href="{{ url_for('dashboard') }}" class="btn" style="margin-top: 30px;">← Back to Dashboard</a>
+    <a href="{{ url_for('dashboard') }}" class="btn" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;">← Back to Dashboard</a>
 </div>
-{% endblock %}f
+
+<script>
+const USER_ID = {{ current_user.id }};
+
+// Load existing profile data
+async function loadProfile() {
+    try {
+        const resp = await fetch(`/api/profile`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.profile) {
+            document.getElementById('profileEmail').value = data.profile.email || '';
+            document.getElementById('profileAddress').value = data.profile.address || '';
+            document.getElementById('profilePhone').value = data.profile.phone_number || '';
+            if (data.profile.profile_picture) {
+                const avatar = document.getElementById('profileAvatar');
+                avatar.innerHTML = `<img src="${data.profile.profile_picture}" style="width:100%;height:100%;object-fit:cover;">`;
+            }
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Save profile
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const formData = new FormData();
+    formData.append('email', document.getElementById('profileEmail').value);
+    formData.append('address', document.getElementById('profileAddress').value);
+    formData.append('phone_number', document.getElementById('profilePhone').value);
+
+    const picFile = document.getElementById('profilePictureInput').files[0];
+    if (picFile) formData.append('profile_picture', picFile);
+
+    try {
+        const resp = await fetch('/api/profile', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (resp.ok) {
+            alert('✅ Profile saved successfully!');
+            location.reload();
+        } else {
+            alert('❌ ' + (data.error || 'Failed to save profile.'));
+        }
+    } catch(e) { alert('❌ Network error.'); }
+});
+
+// Preview selected picture
+document.getElementById('profilePictureInput').addEventListener('change', function() {
+    const file = this.files[0];
+    if (file) {
+        document.getElementById('picPreview').textContent = `Selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+    }
+});
+
+loadProfile();
+</script>
+{% endblock %}

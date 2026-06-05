@@ -302,8 +302,9 @@
         const snippet = post.content ? post.content.substring(0, 120) + (post.content.length > 120 ? '...' : '') : '';
         const category = post.category || 'Announcement';
         const catClass = 'cat-' + category;
+        const detailUrl = `/post/${post.id}`;
         return `
-        <div class="post-card" data-post-id="${post.id}">
+        <div class="post-card" data-post-id="${post.id}" onclick="goToPost(event, ${post.id})">
             <div class="post-header" onclick="expandPost(event, ${post.id})">
                 <div class="post-meta">
                     <span class="status-badge status-published">${post.status || 'Published'}</span>
@@ -314,10 +315,27 @@
                 <p class="post-snippet">${escapeHtml(snippet)}</p>
                 <div class="post-publisher">Posted by <strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></div>
             </div>
-            <div class="expand-hint" onclick="expandPost(event, ${post.id})">Click to read more &amp; interact ▼</div>
+            <div class="expand-hint" onclick="expandPost(event, ${post.id})">
+                Click to preview ▼ &nbsp;|&nbsp; <a href="${detailUrl}" style="color:#0056b3;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">Read full post →</a>
+            </div>
             <div class="post-detail" id="postDetail-${post.id}"></div>
         </div>`;
     }
+
+    // Navigate to full post detail page
+    window.goToPost = function(event, postId) {
+        // Don't navigate if user clicked expand/hint area or interacted with reactions/comments
+        if (event.target.closest('.post-detail') ||
+            event.target.closest('.reaction-bar') ||
+            event.target.closest('.comment-form') ||
+            event.target.closest('.reaction-btn') ||
+            event.target.closest('.comment-submit') ||
+            event.target.closest('.expand-hint') ||
+            event.target.closest('.post-header')) {
+            return;
+        }
+        window.location.href = `/post/${postId}`;
+    };
 
     // Expand/collapse a post (only triggered by header/hint clicks)
     window.expandPost = async function(event, postId) {

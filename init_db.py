@@ -35,6 +35,30 @@ def create_database():
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    # -- Migration: user profile fields ----------------------------------
+    for col, col_def in [
+        ('email', "TEXT DEFAULT ''"),
+        ('address', "TEXT DEFAULT ''"),
+        ('phone_number', "TEXT DEFAULT ''"),
+        ('profile_picture', "TEXT DEFAULT ''"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_def}")
+        except sqlite3.OperationalError:
+            pass
+
+    # -- Migration: post media support -----------------------------------
+    try:
+        cursor.execute("ALTER TABLE posts ADD COLUMN image_path TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
+
+    # -- Migration: nested comments (parent_id) --------------------------
+    try:
+        cursor.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id)")
+    except sqlite3.OperationalError:
+        pass
+
     # -- Comments --------------------------------------------------------
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS comments (

@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .breadcrumb {
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #64748b;
+    }
+    .breadcrumb a {
+        color: #0056b3;
+        text-decoration: none;
+        font-weight: 600;
+    }
+    .breadcrumb a:hover { text-decoration: underline; }
+
+    .post-detail-wrapper {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .post-hero {
+        padding: 32px 36px 24px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .post-hero .badge-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+    .badge {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+    .badge-cat { background: #ede9fe; color: #7c3aed; }
+    .badge-cat-Emergency { background: #fef2f2; color: #dc2626; }
+    .badge-cat-Health { background: #f0f9ff; color: #0284c7; }
+    .badge-cat-Project { background: #fdf8f2; color: #b45309; }
+    .badge-date { background: #f8fafc; color: #64748b; }
+
+    .post-hero h1 {
+        font-size: 26px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }
+    .post-hero .publisher-info {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 12px;
+    }
+    .post-hero .publisher-info strong { color: #0056b3; }
+
+    .post-body {
+        padding: 24px 36px;
+        font-size: 15px;
+        line-height: 1.8;
+        color: #334155;
+        white-space: pre-wrap;
+    }
+    .post-body img {
+        max-width: 100%;
+        border-radius: 10px;
+        margin: 16px 0;
+    }
+
+    /* Reactions */
+    .reaction-section {
+        padding: 12px 36px;
+        border-top: 1px solid #e2e8f0;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
+    }
+    .react-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 8px 14px;
+        border-radius: 20px;
+        border: 1px solid transparent;
+        background: transparent;
+        cursor: pointer;
+        font-size: 18px;
+        transition: all 0.2s;
+        color: #64748b;
+    }
+    .react-btn:hover { background: #e0f2fe; border-color: #bae6fd; transform: scale(1.1); }
+    .react-btn.active { background: #dbeafe; border-color: #0ea5e9; color: #0056b3; }
+    .react-count { font-size: 13px; margin-left: 2px; color: #64748b; }
+
+    /* Comments */
+    .comment-section {
+        padding: 24px 36px;
+        background: #f8fafc;
+    }
+    .comment-section h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 16px;
+    }
+    .comment-input-row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+    .comment-input-row input {
+        flex: 1;
+        padding: 12px 16px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        font-size: 14px;
+    }
+    .comment-input-row input:focus {
+        outline: none;
+        border-color: #0ea5e9;
+        box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
+    }
+    .comment-submit-btn {
+        background: #0ea5e9;
+        color: #fff;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    .comment-submit-btn:hover { background: #0284c7; }
+
+    .comment-item {
+        display: flex;
+        gap: 12px;
+        padding: 14px 0;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .comment-item:last-child { border-bottom: none; }
+    .comment-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #0056b3;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+    .comment-content { flex: 1; }
+    .comment-author { font-size: 13px; font-weight: 700; color: #0f172a; }
+    .comment-author .official { color: #0056b3; font-size: 11px; margin-left: 6px; }
+    .comment-text { font-size: 14px; color: #334155; margin-top: 4px; line-height: 1.5; }
+    .comment-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+    .no-comments { text-align: center; color: #94a3b8; padding: 30px 0; }
+
+    /* Grievance / Feedback CTA */
+    .feedback-cta {
+        margin-top: 28px;
+        padding: 20px 24px;
+        background: #fffbeb;
+        border-radius: 12px;
+        border: 1px solid #fde68a;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .feedback-cta .icon { font-size: 28px; }
+    .feedback-cta .text { flex: 1; }
+    .feedback-cta .text strong { display: block; font-size: 14px; color: #92400e; margin-bottom: 3px; }
+    .feedback-cta .text span { font-size: 13px; color: #a16207; }
+    .feedback-cta .cta-btn {
+        background: #f59e0b;
+        color: #fff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 13px;
+        cursor: pointer;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background 0.2s;
+    }
+    .feedback-cta .cta-btn:hover { background: #d97706; }
+</style>
+
+<div class="breadcrumb">
+    <a href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+</div>
+
+<div class="post-detail-wrapper">
+    <!-- Hero -->
+    <div class="post-hero">
+        <div class="badge-row">
+            <span class="badge badge-cat-{{ post.post.category }}">{{ post.post.category }}</span>
+            <span class="badge badge-date">📅 {{ post.post.created_at }}</span>
+        </div>
+        <h1>{{ post.post.title }}</h1>
+        <div class="publisher-info">
+            Published by <strong>{{ post.post.publisher_name }}</strong>
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div class="post-body">
+        {{ post.post.content }}
+        {% if post.post.image_path %}
+        <img src="{{ post.post.image_path }}" alt="Post image" style="max-width:100%;border-radius:10px;margin-top:16px;">
+        {% endif %}
+    </div>
+
+    <!-- Reactions -->
+    <div class="reaction-section" id="reactionBar">
+        {% for r in post.reaction_counts %}
+        <button class="react-btn {% if post.user_reaction == r.emoji %}active{% endif %}"
+                onclick="toggleReaction('{{ r.emoji }}')" title="React {{ r.emoji }}">
+            {{ r.emoji }}<span class="react-count">{{ r.count }}</span>
+        </button>
+        {% endfor %}
+    </div>
+
+    <!-- Comments -->
+    <div class="comment-section">
+        <h3>💬 Discussion ({{ post.comments|length }})</h3>
+        <div class="comment-input-row">
+            <input type="text" id="commentInput" placeholder="Share your thoughts...">
+            <button class="comment-submit-btn" onclick="submitComment()">Post</button>
+        </div>
+        <div id="commentsList">
+            {% if post.comments %}
+                {% for comment in post.comments %}
+                <div class="comment-item">
+                    <div class="comment-avatar">{{ comment.username[0].upper() }}</div>
+                    <div class="comment-content">
+                        <div class="comment-author">
+                            {{ comment.username }}
+                            {% if role == 'publisher' %}<span class="official">🏛️ Official</span>{% endif %}
+                        </div>
+                        <div class="comment-text">{{ comment.content }}</div>
+                        <div class="comment-time">{{ comment.created_at }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-comments" id="noComments">No comments yet. Be the first to discuss!</div>
+            {% endif %}
+        </div>
+
+        <!-- Feedback / Grievance CTA (from Backend Guide: "Constructive Criticism Channel") -->
+        <div class="feedback-cta">
+            <div class="icon">📣</div>
+            <div class="text">
+                <strong>Have feedback for the Barangay?</strong>
+                <span>Your voice matters. Share suggestions, grievances, or ideas directly with your local government.</span>
+            </div>
+            <a href="{{ url_for('citizens_voice') }}" class="cta-btn">🗣️ Go to Citizens' Voice</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const POST_ID = {{ post.post.id }};
+    const USER_ID = {{ user_id }};
+
+    async function toggleReaction(emoji) {
+        try {
+            const resp = await fetch(`/api/posts/${POST_ID}/react`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({emoji: emoji})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                // Reload to reflect reaction changes cleanly
+                location.reload();
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    async function submitComment() {
+        const input = document.getElementById('commentInput');
+        const content = input.value.trim();
+        if (!content) return;
+
+        try {
+            const resp = await fetch(`/api/posts/${POST_ID}/comments`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content: content})
+            });
+            const data = await resp.json();
+            if (resp.ok) {
+                input.value = '';
+                location.reload();
+            } else {
+                alert(data.error || 'Failed to post comment.');
+            }
+        } catch(e) { alert('Network error.'); }
+    }
+
+    // Enter key submits comment
+    document.getElementById('commentInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') submitComment();
+    });
+</script>
+{% endblock %}
