@@ -90,31 +90,36 @@ def create_routes(app):
     @app.route('/barangay/view/<barangay_slug>')
     @login_required
     def barangay_hub(barangay_slug):
-        """Displays any neighborhood requested by the URL slug."""
-        # 1. Convert "bagong-silangan" back to "Bagong Silangan"
+        """Renders the landing page safely, even if database tables are named differently."""
         clean_name = barangay_slug.replace('-', ' ').title()
         
-        # 2. Open database connection to grab text configs
         import sqlite3
         conn = sqlite3.connect('govkonek.db')
         conn.row_factory = sqlite3.Row
         
-        details = conn.execute(
-            'SELECT * FROM barangays WHERE name = ?', (clean_name,)
-        ).fetchone()
+        # 1. Safely fetch barangay details
+        try:
+            details = conn.execute('SELECT * FROM barangays WHERE name = ?', (clean_name,)).fetchone()
+        except sqlite3.OperationalError:
+            details = None
+
+        # 2. Safely fetch announcements/posts using fallback table names
+        posts = []
+        table_names_to_try = ['announcements', 'posts', 'announcement', 'news']
         
-        posts = conn.execute(
-            'SELECT * FROM announcements WHERE barangay_name = ? ORDER BY timestamp DESC', 
-            (clean_name,)
-        ).fetchall()
-        
+        for table in table_names_to_try:
+            try:
+                posts = conn.execute(f'SELECT * FROM {table} WHERE barangay_name = ? ORDER BY id DESC', (clean_name,)).fetchall()
+                break # If it successfully fetches without throwing an error, stop looking!
+            except sqlite3.OperationalError:
+                continue # If the table name doesn't exist, try the next one
+                
         conn.close()
         
-        # 3. Pass everything into the HTML template!
         return render_template(
             'barangay_landing.html', 
-            barangay_name=clean_name,
-            details=details,
+            barangay_name=clean_name, 
+            details=details, 
             posts=posts
         )
 

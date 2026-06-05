@@ -332,17 +332,13 @@
     <div class="landing-hero-content">
         <div class="hero-icon">🏛️</div>
         <div class="hero-text">
-            <h1>{{ barangay.name if barangay else 'Barangay Hall' }}</h1>
-            <p>
-                {{ barangay.description if barangay and barangay.description else 'The heart of local governance in our community. We are committed to transparent, efficient, and people-centered public service. Visit us for your barangay needs — from permits and certifications to community programs and assistance.' }}
+            <h1>Barangay {{ barangay_name if barangay_name else 'Portal' }}</h1>
+            <p style="font-style:italic; opacity:0.75; margin-top:8px; font-size:14px;">
+                ✦ Serbisyong Tapat, Para sa Lahat!
             </p>
-            {% if barangay and barangay.motto %}
-            <p style="font-style:italic;opacity:0.75;margin-top:8px;font-size:14px;">
-                ✦ {{ barangay.motto }}
-            </p>
-            {% endif %}
-            <div class="hero-actions">
-                <a href="{{ url_for('e_services') }}" class="hero-btn hero-btn-primary">
+        </div>
+        <div class="hero-actions">
+            <a href="{{ url_for('e_services') }}" class="hero-btn hero-btn-primary">
                     📄 Browse E-Services
                 </a>
                 <a href="{{ url_for('barangay_map') }}" class="hero-btn hero-btn-outline">

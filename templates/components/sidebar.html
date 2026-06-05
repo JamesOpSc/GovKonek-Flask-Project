@@ -68,7 +68,7 @@
         <a href="{{ url_for('dashboard') }}" class="sidebar-link" data-page="dashboard">🏠 Home Dashboard</a>
         
         <!-- ADDED: LOCATION-AWARE BARANGAY PROFILE LINK -->
-        <a href="/barangay/{{ current_user.barangay | replace(' ', '-') if current_user.barangay else 'Payatas' }}" class="sidebar-link" data-page="barangay">🏛️ My Barangay Hub</a>
+        <a href="/barangay/my-hub" class="sidebar-link" data-page="barangay">🏛️ My Barangay Hub</a>
         
         <a href="{{ url_for('barangay_map') }}" class="sidebar-link" data-page="barangay_map">🗺️ Barangay Map</a>
         <a href="{{ url_for('projects') }}" class="sidebar-link" data-page="projects">🏗️ Projects</a>
