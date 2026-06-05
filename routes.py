@@ -13,6 +13,7 @@ REFACTORED for testability:
 
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
+from file_upload import get_upload_helper
 
 
 def _get_services():
@@ -33,6 +34,8 @@ def _get_services():
         'document_service': ext['document_service'],
         'voice': ext['voice_service'],
         'voice_repo': ext['voice_repo'],
+        'barangay_repo': ext['barangay_repo'],
+        'barangay_service': ext['barangay_service'],
     }
 
 
@@ -77,12 +80,18 @@ def create_routes(app):
 
             if success:
                 login_user(user)
+
+                # Redirect publishers to their barangay landing page
+                if user.role == 'publisher':
+                    return redirect(url_for('barangay_landing'))
+
+                # All other users go to dashboard
                 return redirect(url_for('dashboard'))
             else:
                 flash('Invalid username or password.', 'error')
 
         return render_template('login.html')
-
+    
     @app.route('/dashboard')
     @login_required
     def dashboard():
@@ -90,10 +99,20 @@ def create_routes(app):
         svc = _get_services()
         user_data = svc['user_repo'].find_by_id(current_user.id)
         profile_pic = user_data['profile_picture'] if user_data else ''
+
+        # Check if publisher already has a barangay
+        barangay = None
+        has_barangay = False
+        if current_user.role == 'publisher':
+            barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+            has_barangay = barangay is not None
+
         return render_template('dashboard.html',
                                name=current_user.username,
                                role=current_user.role,
-                               profile_picture=profile_pic)
+                               profile_picture=profile_pic,
+                               barangay=barangay,
+                               has_barangay=has_barangay)
 
     @app.route('/profile')
     @login_required
@@ -191,21 +210,14 @@ def create_routes(app):
             content = data.get('content', '') if data else ''
             category = data.get('category', 'Announcement') if data else 'Announcement'
 
-        # Handle image upload
+        # Handle image upload using centralized FileUploadHelper (OOP Abstraction)
         image_path = ''
         uploaded_image = request.files.get('image') if request.files else None
         if uploaded_image and uploaded_image.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_image.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"post_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_image.save(filepath)
-            image_path = f'/static/uploads/{safe_name}'
+            try:
+                image_path = get_upload_helper().save(uploaded_image, prefix='post')
+            except ValueError:
+                pass  # Invalid file type — silently skip image
 
         svc = _get_services()
         post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
@@ -252,6 +264,65 @@ def create_routes(app):
         return render_template('barangay_map.html',
                                name=current_user.username,
                                role=current_user.role)
+
+    @app.route('/barangay-landing')
+    @login_required
+    def barangay_landing():
+        """
+        Barangay Hall landing page — dynamically pulls data from the barangays table.
+
+        If a publisher is logged in, shows THEIR barangay.
+        Otherwise, shows the first/default barangay.
+        """
+        svc = _get_services()
+
+        # If the current user is a publisher, try to show their barangay
+        barangay = None
+        is_owner = False
+        if current_user.role == 'publisher':
+            barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+            if barangay:
+                is_owner = True
+
+        # Fall back to the default/first barangay
+        if not barangay:
+            barangay = svc['barangay_repo'].get_first()
+
+        # Fetch barangay stats for the landing page
+        projects = svc['project_repo'].get_all()
+        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
+
+        return render_template('barangay_landing.html',
+                               name=current_user.username,
+                               role=current_user.role,
+                               barangay=barangay,
+                               is_owner=is_owner,
+                               projects=projects,
+                               announcements=announcements)
+
+    @app.route('/barangay/<int:barangay_id>/landing')
+    @login_required
+    def barangay_landing_by_id(barangay_id):
+        """View a specific barangay's landing page by ID."""
+        svc = _get_services()
+        barangay = svc['barangay_repo'].get_by_id(barangay_id)
+        if not barangay:
+            flash('Barangay not found.', 'error')
+            return redirect(url_for('barangay_landing'))
+
+        is_owner = (current_user.role == 'publisher' and
+                    barangay.get('publisher_id') == current_user.id)
+
+        projects = svc['project_repo'].get_all()
+        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
+
+        return render_template('barangay_landing.html',
+                               name=current_user.username,
+                               role=current_user.role,
+                               barangay=barangay,
+                               is_owner=is_owner,
+                               projects=projects,
+                               announcements=announcements)
 
     @app.route('/projects')
     @login_required
@@ -318,8 +389,10 @@ def create_routes(app):
     @login_required
     def barangay_profile(publisher_id):
         """
-        Barangay profile page — shows a publisher's projects, announcements,
-        and transparency documents in one view.
+        Barangay profile page — shows a publisher's barangay info, projects,
+        announcements, and transparency documents in one view.
+
+        Clicking a publisher name on any post in the feed navigates here.
         """
         svc = _get_services()
         # Get publisher info
@@ -327,6 +400,9 @@ def create_routes(app):
         if not publisher or publisher['role'] != 'publisher':
             flash('Barangay not found.', 'error')
             return redirect(url_for('dashboard'))
+
+        # Get the barangay record for this publisher (if they created one)
+        barangay = svc['barangay_repo'].get_by_publisher(publisher_id)
 
         # Get publisher's projects
         projects = svc['project_repo'].get_by_publisher(publisher_id)
@@ -337,11 +413,17 @@ def create_routes(app):
         # Get all documents (documents table doesn't have publisher_id yet)
         documents = svc['document_repo'].get_all()
 
+        # Determine if current user is the owner
+        is_owner = (current_user.role == 'publisher' and
+                    current_user.id == publisher_id)
+
         return render_template('barangay_profile.html',
                                publisher=dict(publisher),
+                               barangay=barangay,
                                projects=projects,
                                posts=posts,
                                documents=documents,
+                               is_owner=is_owner,
                                name=current_user.username,
                                role=current_user.role)
 
@@ -469,20 +551,15 @@ def create_routes(app):
         phone_number = request.form.get('phone_number', '').strip()
         profile_picture_path = ''
 
-        # Handle profile picture upload
+        # Handle profile picture upload using centralized FileUploadHelper
         uploaded_file = request.files.get('profile_picture')
         if uploaded_file and uploaded_file.filename:
-            import os
-            from datetime import datetime
-            upload_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads'
-            )
-            os.makedirs(upload_dir, exist_ok=True)
-            ext = uploaded_file.filename.rsplit('.', 1)[-1].lower()
-            safe_name = f"profile_{current_user.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{ext}"
-            filepath = os.path.join(upload_dir, safe_name)
-            uploaded_file.save(filepath)
-            profile_picture_path = f'/static/uploads/{safe_name}'
+            try:
+                profile_picture_path = get_upload_helper().save(
+                    uploaded_file, prefix=f'profile_{current_user.id}'
+                )
+            except ValueError:
+                profile_picture_path = ''  # Invalid file type — skip
 
         user_repo.update_profile(
             current_user.id,
@@ -697,3 +774,89 @@ def create_routes(app):
         if error:
             return jsonify({'error': error}), 400
         return jsonify(result)
+
+    # ================================================================
+    # BARANGAY LANDING PAGE CRUD API (publisher-only)
+    # ================================================================
+
+    @app.route('/api/barangays')
+    @login_required
+    def api_get_barangays():
+        """API: Get all barangays."""
+        svc = _get_services()
+        barangays = svc['barangay_repo'].get_all()
+        return jsonify({'barangays': barangays})
+
+    @app.route('/api/barangays/<int:barangay_id>')
+    @login_required
+    def api_get_barangay(barangay_id):
+        """API: Get a single barangay by ID."""
+        svc = _get_services()
+        barangay = svc['barangay_repo'].get_by_id(barangay_id)
+        if not barangay:
+            return jsonify({'error': 'Barangay not found'}), 404
+        return jsonify({'barangay': barangay})
+
+    @app.route('/api/barangays', methods=['POST'])
+    @login_required
+    def api_create_barangay():
+        """
+        API: Create a new barangay landing page. ONLY publisher can create.
+
+        Accepts JSON with fields:
+          - name (required)
+          - description, address, phone, email, facebook
+          - office_hours_weekday, office_hours_saturday
+          - motto, latitude, longitude
+        """
+        data = request.get_json() or {}
+        svc = _get_services()
+        barangay, error = svc['barangay_service'].create_barangay(
+            user=current_user,
+            name=data.get('name', ''),
+            description=data.get('description', ''),
+            address=data.get('address', ''),
+            phone=data.get('phone', ''),
+            email=data.get('email', ''),
+            facebook=data.get('facebook', ''),
+            office_hours_weekday=data.get('office_hours_weekday', '8:00 AM – 5:00 PM'),
+            office_hours_saturday=data.get('office_hours_saturday', '8:00 AM – 12:00 PM'),
+            motto=data.get('motto', ''),
+            latitude=data.get('latitude', 14.71309),
+            longitude=data.get('longitude', 121.10063),
+        )
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'barangay': barangay}), 201
+
+    @app.route('/api/barangays/<int:barangay_id>', methods=['PUT'])
+    @login_required
+    def api_update_barangay(barangay_id):
+        """
+        API: Update a barangay's landing-page info. ONLY the owning publisher.
+
+        Accepts JSON with any of the updatable fields:
+          name, description, address, phone, email, facebook,
+          office_hours_weekday, office_hours_saturday, motto,
+          latitude, longitude
+        """
+        data = request.get_json() or {}
+        svc = _get_services()
+        barangay, error = svc['barangay_service'].update_barangay(
+            user=current_user,
+            barangay_id=barangay_id,
+            **{k: v for k, v in data.items() if v is not None}
+        )
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'barangay': barangay})
+
+    @app.route('/api/barangays/<int:barangay_id>', methods=['DELETE'])
+    @login_required
+    def api_delete_barangay(barangay_id):
+        """API: Delete a barangay page. ONLY the owning publisher."""
+        svc = _get_services()
+        success, error = svc['barangay_service'].delete_barangay(current_user, barangay_id)
+        if error:
+            return jsonify({'error': error}), 403
+        return jsonify({'success': True})

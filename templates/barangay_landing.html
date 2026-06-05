@@ -1,0 +1,793 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* ── Hero Banner ── */
+    .landing-hero {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0056b3 100%);
+        color: white;
+        padding: 48px 44px;
+        border-radius: 16px;
+        margin-bottom: 28px;
+        position: relative;
+        overflow: hidden;
+    }
+    .landing-hero::before {
+        content: '';
+        position: absolute;
+        top: -60px;
+        right: -60px;
+        width: 260px;
+        height: 260px;
+        background: rgba(255,255,255,0.04);
+        border-radius: 50%;
+    }
+    .landing-hero::after {
+        content: '';
+        position: absolute;
+        bottom: -40px;
+        right: 140px;
+        width: 160px;
+        height: 160px;
+        background: rgba(255,255,255,0.03);
+        border-radius: 50%;
+    }
+    .landing-hero-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 32px;
+        flex-wrap: wrap;
+    }
+    .hero-icon {
+        width: 100px;
+        height: 100px;
+        background: rgba(255,255,255,0.12);
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 52px;
+        flex-shrink: 0;
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255,255,255,0.15);
+    }
+    .hero-text h1 {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 6px;
+        letter-spacing: -0.5px;
+    }
+    .hero-text p {
+        font-size: 15px;
+        opacity: 0.85;
+        line-height: 1.6;
+        max-width: 600px;
+    }
+    .hero-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+    }
+    .hero-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 11px 22px;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+        text-decoration: none;
+        transition: all 0.25s;
+        cursor: pointer;
+        border: none;
+    }
+    .hero-btn-primary {
+        background: #ffffff;
+        color: #0056b3;
+    }
+    .hero-btn-primary:hover {
+        background: #f0f9ff;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    }
+    .hero-btn-outline {
+        background: rgba(255,255,255,0.1);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    .hero-btn-outline:hover {
+        background: rgba(255,255,255,0.2);
+        border-color: rgba(255,255,255,0.5);
+    }
+
+    /* ── Two-column grid ── */
+    .landing-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 24px;
+        margin-bottom: 28px;
+    }
+    @media (max-width: 900px) {
+        .landing-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ── Section Card ── */
+    .section-card {
+        background: #fff;
+        border-radius: 14px;
+        border: 1px solid #e2e8f0;
+        padding: 28px;
+    }
+    .section-card h3 {
+        font-size: 18px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 20px;
+        padding-bottom: 14px;
+        border-bottom: 2px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* ── Services List ── */
+    .service-list-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 14px;
+        border-radius: 10px;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+        margin-bottom: 6px;
+    }
+    .service-list-item:hover {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+    }
+    .service-list-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+    }
+    .service-list-info h4 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 2px;
+    }
+    .service-list-info p {
+        font-size: 12px;
+        color: #64748b;
+        line-height: 1.4;
+    }
+
+    /* ── Info Cards (Office Hours, Contact) ── */
+    .info-row {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+    .info-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .info-item:last-child { border-bottom: none; }
+    .info-item .info-icon {
+        font-size: 20px;
+        width: 28px;
+        flex-shrink: 0;
+        text-align: center;
+    }
+    .info-item .info-text {
+        font-size: 14px;
+        color: #334155;
+        line-height: 1.5;
+    }
+    .info-item .info-text strong {
+        color: #0f172a;
+        display: block;
+        margin-bottom: 2px;
+    }
+
+    /* ── Quick Links Grid ── */
+    .quick-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+    }
+    .quick-link-card {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 20px 16px;
+        text-align: center;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.25s;
+        cursor: pointer;
+    }
+    .quick-link-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0,86,179,0.1);
+        border-color: #93c5fd;
+    }
+    .quick-link-card .ql-icon {
+        font-size: 34px;
+        margin-bottom: 10px;
+    }
+    .quick-link-card .ql-label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .quick-link-card .ql-sublabel {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 3px;
+    }
+
+    /* ── Announcement Banner ── */
+    .announcement-banner {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border: 1px solid #fcd34d;
+        border-radius: 12px;
+        padding: 18px 24px;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        color: #92400e;
+    }
+    .announcement-banner .announce-icon {
+        font-size: 28px;
+        flex-shrink: 0;
+    }
+    .announcement-banner .announce-text {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.5;
+    }
+
+    /* ── Project Mini Cards ── */
+    .mini-project-row {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .mini-project {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.2s;
+    }
+    .mini-project:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+    }
+    .mini-project-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .mini-project-info {
+        flex: 1;
+        min-width: 0;
+    }
+    .mini-project-info .mp-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #0f172a;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mini-project-info .mp-meta {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    .status-dot { background: #f59e0b; }
+    .status-dot.completed { background: #10b981; }
+    .status-dot.planned { background: #8b5cf6; }
+</style>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- HERO BANNER                                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="landing-hero">
+    <div class="landing-hero-content">
+        <div class="hero-icon">🏛️</div>
+        <div class="hero-text">
+            <h1>{{ barangay.name if barangay else 'Barangay Hall' }}</h1>
+            <p>
+                {{ barangay.description if barangay and barangay.description else 'The heart of local governance in our community. We are committed to transparent, efficient, and people-centered public service. Visit us for your barangay needs — from permits and certifications to community programs and assistance.' }}
+            </p>
+            {% if barangay and barangay.motto %}
+            <p style="font-style:italic;opacity:0.75;margin-top:8px;font-size:14px;">
+                ✦ {{ barangay.motto }}
+            </p>
+            {% endif %}
+            <div class="hero-actions">
+                <a href="{{ url_for('e_services') }}" class="hero-btn hero-btn-primary">
+                    📄 Browse E-Services
+                </a>
+                <a href="{{ url_for('barangay_map') }}" class="hero-btn hero-btn-outline">
+                    🗺️ View on Map
+                </a>
+                {% if role == 'publisher' and is_owner %}
+                <button class="hero-btn hero-btn-outline" onclick="toggleEditForm()" style="cursor:pointer;">
+                    ✏️ Edit Barangay Info
+                </button>
+                {% elif role == 'publisher' and not is_owner %}
+                <button class="hero-btn hero-btn-outline" onclick="toggleCreateForm()" style="cursor:pointer;">
+                    🏛️ Create My Barangay
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- ANNOUNCEMENT                               -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="announcement-banner">
+    <span class="announce-icon">📢</span>
+    <span class="announce-text">
+        <strong>Office Advisory:</strong> The {{ barangay.name if barangay else 'Barangay Hall' }} is open Monday to Friday, {{ barangay.office_hours_weekday if barangay else '8:00 AM – 5:00 PM' }}.
+        For urgent concerns outside office hours, please contact the Barangay Public Safety Office.
+    </span>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- QUICK LINKS                                -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="quick-links">
+    <a href="{{ url_for('e_services') }}" class="quick-link-card">
+        <div class="ql-icon">📄</div>
+        <div class="ql-label">E-Services</div>
+        <div class="ql-sublabel">Permits &amp; Certificates</div>
+    </a>
+    <a href="{{ url_for('projects') }}" class="quick-link-card">
+        <div class="ql-icon">🏗️</div>
+        <div class="ql-label">Projects</div>
+        <div class="ql-sublabel">Ongoing &amp; Completed</div>
+    </a>
+    <a href="{{ url_for('documents') }}" class="quick-link-card">
+        <div class="ql-icon">🔍</div>
+        <div class="ql-label">Transparency</div>
+        <div class="ql-sublabel">Public Documents</div>
+    </a>
+    <a href="{{ url_for('citizens_voice') }}" class="quick-link-card">
+        <div class="ql-icon">🗣️</div>
+        <div class="ql-label">Citizens' Voice</div>
+        <div class="ql-sublabel">Share Your Feedback</div>
+    </a>
+    <a href="{{ url_for('barangay_map') }}" class="quick-link-card">
+        <div class="ql-icon">🗺️</div>
+        <div class="ql-label">Barangay Map</div>
+        <div class="ql-sublabel">Explore Locations</div>
+    </a>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- TWO-COLUMN LAYOUT                          -->
+<!-- ═══════════════════════════════════════════ -->
+<div class="landing-grid">
+    <!-- LEFT: Announcements -->
+    <div class="section-card" id="announcementsSection">
+        <h3>📢 Announcements</h3>
+
+        <div id="announcementsList">
+            {% if announcements %}
+                {% for a in announcements %}
+                <div class="service-list-item announcement-item" data-id="{{ a.id }}">
+                    <div class="service-list-icon" style="background:#eff6ff;">📢</div>
+                    <div class="service-list-info">
+                        <h4>{{ a.title }}</h4>
+                        <p>{{ a.content[:120] }}{% if a.content|length > 120 %}...{% endif %}</p>
+                        <small style="color:#94a3b8;font-size:11px;">{{ a.created_at }} · {{ a.publisher_name }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-officials" style="padding:24px;text-align:center;color:#94a3b8;font-size:14px;">
+                    No announcements yet.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- RIGHT: Office Hours + Contact + Projects -->
+    <div style="display:flex;flex-direction:column;gap:24px;">
+        <!-- Office Hours -->
+        <div class="section-card">
+            <h3>🕐 Office Hours</h3>
+            <div class="info-row">
+                <div class="info-item">
+                    <span class="info-icon">📅</span>
+                    <span class="info-text">
+                        <strong>Monday – Friday</strong>
+                        {{ barangay.office_hours_weekday if barangay else '8:00 AM – 5:00 PM' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">☀️</span>
+                    <span class="info-text">
+                        <strong>Saturday</strong>
+                        {{ barangay.office_hours_saturday if barangay else '8:00 AM – 12:00 PM (Half Day)' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">🚫</span>
+                    <span class="info-text">
+                        <strong>Sunday &amp; Public Holidays</strong>
+                        Closed
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="section-card">
+            <h3>📞 Contact Information</h3>
+            <div class="info-row">
+                <div class="info-item">
+                    <span class="info-icon">📍</span>
+                    <span class="info-text">
+                        <strong>Address</strong>
+                        {{ barangay.address if barangay and barangay.address else 'Barangay Hall, Payatas, Quezon City, Metro Manila' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">📞</span>
+                    <span class="info-text">
+                        <strong>Phone</strong>
+                        {{ barangay.phone if barangay and barangay.phone else '(02) 8XXX-XXXX' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">✉️</span>
+                    <span class="info-text">
+                        <strong>Email</strong>
+                        {{ barangay.email if barangay and barangay.email else 'barangayhall@govkonek.ph' }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">🌐</span>
+                    <span class="info-text">
+                        <strong>Facebook</strong>
+                        {{ barangay.facebook if barangay and barangay.facebook else 'facebook.com/BarangayPayatasOfficial' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Projects Preview -->
+        {% if projects %}
+        <div class="section-card">
+            <h3>🏗️ Recent Projects</h3>
+            <div class="mini-project-row">
+                {% for p in projects[:5] %}
+                <div class="mini-project">
+                    <span class="mini-project-dot {{ 'completed' if p.status == 'completed' else '' }} {{ 'planned' if p.status == 'planned' else '' }}" style="{% if p.status == 'ongoing' or not p.status %}background:#f59e0b;{% elif p.status == 'completed' %}background:#10b981;{% elif p.status == 'planned' %}background:#8b5cf6;{% else %}background:#94a3b8;{% endif %}"></span>
+                    <div class="mini-project-info">
+                        <div class="mp-title">{{ p.title }}</div>
+                        <div class="mp-meta">{{ p.status|capitalize }} {% if p.budget %} · ₱{{ '{:,.0f}'.format(p.budget|float) }}{% endif %}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if projects|length > 5 %}
+            <a href="{{ url_for('projects') }}" style="display:block;text-align:center;margin-top:14px;font-size:13px;font-weight:600;color:#0056b3;text-decoration:none;">
+                View All {{ projects|length }} Projects →
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- BARANGAY OFFICIALS                         -->
+<!-- ═══════════════════════════════════════════ -->
+<style>
+
+
+<!-- ═══════════════════════════════════════════ -->
+<!-- EDIT / CREATE BARANGAY FORM (publisher)    -->
+<!-- ═══════════════════════════════════════════ -->
+{% if role == 'publisher' %}
+<style>
+    .edit-form-overlay {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 40px 20px;
+        overflow-y: auto;
+    }
+    .edit-form-overlay.active { display: flex; }
+    .edit-form-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 32px;
+        width: 100%;
+        max-width: 680px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .edit-form-card h3 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-grid .full-width { grid-column: 1 / -1; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .form-group input, .form-group textarea {
+        padding: 10px 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: 'Inter', sans-serif;
+        transition: border 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus {
+        border-color: #0056b3;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,86,179,0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        justify-content: flex-end;
+    }
+    .btn-cancel {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-save {
+        background: #0056b3;
+        color: #fff;
+        border: none;
+        padding: 10px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+    .btn-save:hover { background: #004085; }
+    .btn-cancel:hover { background: #e2e8f0; }
+    .form-status {
+        margin-top: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        text-align: center;
+        display: none;
+    }
+    .form-status.success { color: #10b981; display: block; }
+    .form-status.error { color: #ef4444; display: block; }
+</style>
+
+<div class="edit-form-overlay" id="barangayFormOverlay">
+    <div class="edit-form-card">
+        <h3 id="formTitle">🏛️ Edit Barangay Information</h3>
+        <form id="barangayForm" onsubmit="saveBarangay(event)">
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label>Barangay Name *</label>
+                    <input type="text" id="fldName" placeholder="e.g. Barangay Payatas" required>
+                </div>
+                <div class="form-group full-width">
+                    <label>Description</label>
+                    <textarea id="fldDesc" placeholder="A brief description of your barangay..."></textarea>
+                </div>
+                <div class="form-group full-width">
+                    <label>Motto / Tagline</label>
+                    <input type="text" id="fldMotto" placeholder="e.g. Serbisyong Tapat, Para sa Lahat!">
+                </div>
+                <div class="form-group full-width">
+                    <label>Address *</label>
+                    <input type="text" id="fldAddress" placeholder="Full street address — e.g. 123 Rizal St., Barangay Payatas, Quezon City" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone</label>
+                    <input type="text" id="fldPhone" placeholder="(02) 8XXX-XXXX">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="fldEmail" placeholder="barangay@email.com">
+                </div>
+                <div class="form-group">
+                    <label>Facebook</label>
+                    <input type="text" id="fldFacebook" placeholder="facebook.com/...">
+                </div>
+                <div class="form-group">
+                    <label>Office Hours (Weekday)</label>
+                    <input type="text" id="fldWeekday" placeholder="8:00 AM – 5:00 PM">
+                </div>
+                <div class="form-group">
+                    <label>Office Hours (Saturday)</label>
+                    <input type="text" id="fldSaturday" placeholder="8:00 AM – 12:00 PM">
+                </div>
+                <div class="form-group">
+                    <label>Latitude</label>
+                    <input type="number" step="any" id="fldLat" placeholder="14.71309">
+                </div>
+                <div class="form-group">
+                    <label>Longitude</label>
+                    <input type="number" step="any" id="fldLng" placeholder="121.10063">
+                </div>
+            </div>
+            <div class="form-status" id="formStatus"></div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" onclick="closeForm()">Cancel</button>
+                <button type="submit" class="btn-save" id="btnSave">💾 Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Pass barangay data to JS
+    window.BARANGAY_DATA = {{ barangay | tojson if barangay else 'null' }};
+    window.BARANGAY_ID = {{ barangay.id if barangay else 'null' }};
+    window.IS_OWNER = {{ 'true' if is_owner else 'false' }};
+
+    function toggleEditForm() {
+        const form = document.getElementById('barangayFormOverlay');
+        document.getElementById('formTitle').textContent = '🏛️ Edit Barangay Information';
+        document.getElementById('btnSave').textContent = '💾 Save Changes';
+        // Pre-fill form with existing data
+        if (window.BARANGAY_DATA) {
+            const b = window.BARANGAY_DATA;
+            document.getElementById('fldName').value = b.name || '';
+            document.getElementById('fldDesc').value = b.description || '';
+            document.getElementById('fldMotto').value = b.motto || '';
+            document.getElementById('fldAddress').value = b.address || '';
+            document.getElementById('fldPhone').value = b.phone || '';
+            document.getElementById('fldEmail').value = b.email || '';
+            document.getElementById('fldFacebook').value = b.facebook || '';
+            document.getElementById('fldWeekday').value = b.office_hours_weekday || '';
+            document.getElementById('fldSaturday').value = b.office_hours_saturday || '';
+            document.getElementById('fldLat').value = b.latitude || 14.71309;
+            document.getElementById('fldLng').value = b.longitude || 121.10063;
+        }
+        form.classList.add('active');
+    }
+
+    function toggleCreateForm() {
+        const form = document.getElementById('barangayFormOverlay');
+        document.getElementById('formTitle').textContent = '🏛️ Create Your Barangay';
+        document.getElementById('btnSave').textContent = '✨ Create Barangay';
+        // Clear form
+        ['fldName','fldDesc','fldMotto','fldAddress','fldPhone','fldEmail','fldFacebook','fldWeekday','fldSaturday','fldLat','fldLng'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        document.getElementById('fldWeekday').value = '8:00 AM – 5:00 PM';
+        document.getElementById('fldSaturday').value = '8:00 AM – 12:00 PM';
+        document.getElementById('fldLat').value = 14.71309;
+        document.getElementById('fldLng').value = 121.10063;
+        form.classList.add('active');
+    }
+
+    function closeForm() {
+        document.getElementById('barangayFormOverlay').classList.remove('active');
+        document.getElementById('formStatus').className = 'form-status';
+    }
+
+    async function saveBarangay(e) {
+        e.preventDefault();
+        const statusEl = document.getElementById('formStatus');
+        statusEl.className = 'form-status';
+        statusEl.textContent = '';
+
+        const payload = {
+            name: document.getElementById('fldName').value.trim(),
+            description: document.getElementById('fldDesc').value.trim(),
+            motto: document.getElementById('fldMotto').value.trim(),
+            address: document.getElementById('fldAddress').value.trim(),
+            phone: document.getElementById('fldPhone').value.trim(),
+            email: document.getElementById('fldEmail').value.trim(),
+            facebook: document.getElementById('fldFacebook').value.trim(),
+            office_hours_weekday: document.getElementById('fldWeekday').value.trim(),
+            office_hours_saturday: document.getElementById('fldSaturday').value.trim(),
+            latitude: parseFloat(document.getElementById('fldLat').value) || 14.71309,
+            longitude: parseFloat(document.getElementById('fldLng').value) || 121.10063,
+        };
+
+        if (!payload.name) {
+            statusEl.className = 'form-status error';
+            statusEl.textContent = 'Barangay name is required.';
+            return;
+        }
+        if (!payload.address) {
+            statusEl.className = 'form-status error';
+            statusEl.textContent = 'Barangay address is required.';
+            return;
+        }
+
+        const isCreate = !window.IS_OWNER;
+        const url = isCreate ? '/api/barangays' : `/api/barangays/${window.BARANGAY_ID}`;
+        const method = isCreate ? 'POST' : 'PUT';
+
+        try {
+            const resp = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            if (resp.ok) {
+                statusEl.className = 'form-status success';
+                statusEl.textContent = isCreate ? '✅ Barangay created! Reloading...' : '✅ Barangay updated! Reloading...';
+                setTimeout(() => { window.location.href = '/barangay-landing'; }, 1000);
+            } else {
+                statusEl.className = 'form-status error';
+                statusEl.textContent = '❌ ' + (result.error || 'Something went wrong.');
+            }
+        } catch (err) {
+            statusEl.className = 'form-status error';
+            statusEl.textContent = '❌ Network error. Please try again.';
+        }
+    }
+
+    // Auto-open create form if ?create=1 is in the URL AND user doesn't own a barangay
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const isOwner = {{ 'true' if is_owner else 'false' }};
+        if (params.get('create') === '1' && !isOwner) {
+            toggleCreateForm();
+            // Clean the URL without reloading
+            if (window.history && window.history.replaceState) {
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+    })();
+</script>
+{% endif %}
+
+{% endblock %}

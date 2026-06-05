@@ -104,6 +104,7 @@
 <div class="info-panel">
     <h4 style="font-weight:700; margin-bottom:14px;">📍 Barangay at a Glance</h4>
     <div class="info-card">
+        <div class="info-stat"><div class="stat-num" id="barangayCount">-</div><div class="stat-label">Barangays</div></div>
         <div class="info-stat"><div class="stat-num" id="totalProjects">-</div><div class="stat-label">Total Projects</div></div>
         <div class="info-stat"><div class="stat-num" id="ongoingCount">-</div><div class="stat-label">Ongoing</div></div>
         <div class="info-stat"><div class="stat-num" id="completedCount">-</div><div class="stat-label">Completed</div></div>
@@ -113,7 +114,7 @@
 
 <script>
 (function() {
-    const map = L.map('barangayMap').setView([14.6760, 121.0437], 15);
+    const map = L.map('barangayMap').setView([14.71309, 121.10063], 14);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
@@ -137,22 +138,107 @@
     const statusColors = { ongoing: '#f59e0b', completed: '#10b981', planned: '#8b5cf6' };
     const statusIcons = { ongoing: '🏗️', completed: '✅', planned: '📋' };
 
-    // Barangay center
-    const centerLat = 14.6760, centerLng = 121.0437;
+    // Barangay center — Payatas, Quezon City
+    const centerLat = 14.71309, centerLng = 121.10063;
 
-    // Draw barangay boundary
-    L.polygon([
-        [14.6730, 121.0405], [14.6730, 121.0470],
-        [14.6790, 121.0470], [14.6790, 121.0405]
-    ], {
-        color: '#0056b3', weight: 2.5, fillColor: '#0056b3',
-        fillOpacity: 0.06, dashArray: '8 4'
-    }).addTo(map).bindPopup('<strong>🏛️ Barangay Boundary</strong>');
+    
+    // Special marker icon for barangay halls (larger, with building emoji)
+    function makeBarangayIcon() {
+        return L.divIcon({
+            html: `<div style="background:#0056b3;width:40px;height:40px;border-radius:10px;border:3px solid #fff;box-shadow:0 3px 12px rgba(0,86,179,0.4);display:flex;align-items:center;justify-content:center;font-size:20px;">🏛️</div>`,
+            iconSize: [40, 40], iconAnchor: [20, 20], popupAnchor: [0, -24]
+        });
+    }
 
-    // Barangay Hall marker (always shown)
-    L.marker([centerLat, centerLng], { icon: makeIcon('#0056b3') })
+    // Additional static barangay pins
+
+    const batasanHills = {
+    name: "Barangay Batasan Hills",
+    lat: 14.690711725647242,
+    lng: 121.0960923629261,
+    link: "/barangay/batasan-hills/landing"
+    };
+
+    const bagongSilangan = {
+    name: "Barangay Bagong Silangan",
+    lat: 14.697863596837893,
+    lng: 121.11043567927592,
+    link: "/barangay/bagong-silangan/landing"
+    };
+
+    [batasanHills, bagongSilangan].forEach(b => {
+    L.marker([b.lat, b.lng], { icon: makeBarangayIcon() })
         .addTo(map)
-        .bindPopup('<strong>🏛️ Barangay Hall</strong><br><span style="font-size:13px;color:#475569;">Main administrative building.</span>');
+        .bindPopup(`
+            <strong>🏛️ <a href="${b.link}" style="color:#0056b3;text-decoration:underline;">
+                ${escapeHtml(b.name)}
+            </a></strong>
+            <br><span style="font-size:13px;color:#475569;">
+                Barangay location marker.
+            </span>
+            <div style="margin-top:6px;">
+                <a href="${b.link}" style="display:inline-block;background:#0056b3;color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">
+                    View Details →
+                </a>
+            </div>
+        `);
+    });
+    
+    function makeIcon(color) {
+        return L.divIcon({
+            html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
+        });
+    }
+
+    // Fetch barangays and place markers (exclude default/template barangay with no publisher)
+    fetch('/api/barangays')
+        .then(r => r.json())
+        .then(d => {
+            const barangays = (d.barangays || []).filter(b => b.publisher_id !== null && b.publisher_id !== undefined);
+            document.getElementById('barangayCount').textContent = barangays.length;
+
+            // If no barangays from API, place a fallback default marker
+            if (barangays.length === 0) {
+                L.marker([centerLat, centerLng], { icon: makeBarangayIcon() })
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>🏛️ <a href="/barangay-landing" style="color:#0056b3;text-decoration:underline;">Barangay Hall</a></strong>
+                        <br><span style="font-size:13px;color:#475569;">Main administrative building.</span>
+                    `);
+                return;
+            }
+
+            barangays.forEach(b => {
+                const lat = b.latitude || centerLat;
+                const lng = b.longitude || centerLng;
+                const descSnippet = (b.description || '').substring(0, 100);
+                const mottoLine = b.motto ? `<div style="font-size:12px;color:#64748b;font-style:italic;margin-top:2px;">✦ ${escapeHtml(b.motto)}</div>` : '';
+
+                L.marker([lat, lng], { icon: makeBarangayIcon() })
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>🏛️ <a href="/barangay/${b.id}/landing" style="color:#0056b3;text-decoration:underline;">${escapeHtml(b.name)}</a></strong>
+                        ${mottoLine}
+                        ${descSnippet ? '<div style="font-size:12px;color:#475569;margin-top:4px;line-height:1.4;">' + escapeHtml(descSnippet) + '...</div>' : ''}
+                        <div style="font-size:12px;color:#64748b;margin-top:6px;">
+                            📍 ${escapeHtml(b.address || 'Address not set')}
+                        </div>
+                        ${b.phone ? '<div style="font-size:12px;color:#64748b;">📞 ' + escapeHtml(b.phone) + '</div>' : ''}
+                        <div style="margin-top:6px;">
+                            <a href="/barangay/${b.id}/landing" style="display:inline-block;background:#0056b3;color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;text-decoration:none;">View Details →</a>
+                        </div>
+                    `);
+            });
+        }).catch(() => {
+            // Fallback if API fails
+            L.marker([centerLat, centerLng], { icon: makeBarangayIcon() })
+                .addTo(map)
+                .bindPopup(`
+                    <strong>🏛️ <a href="/barangay-landing" style="color:#0056b3;text-decoration:underline;">Barangay Hall</a></strong>
+                    <br><span style="font-size:13px;color:#475569;">Main administrative building.</span>
+                `);
+        });
 
     // Fetch projects and place markers
     fetch('/api/projects')
@@ -203,7 +289,7 @@
 
     // Legend
     document.querySelector('.map-legend').innerHTML = `
-        <div class="legend-item"><span class="legend-dot" style="background:#0056b3;"></span> Barangay Hall</div>
+        <div class="legend-item"><span class="legend-dot" style="background:#0056b3;width:14px;height:14px;border-radius:4px;"></span> Barangay Halls</div>
         <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span> Ongoing Projects</div>
         <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span> Completed Projects</div>
         <div class="legend-item"><span class="legend-dot" style="background:#8b5cf6;"></span> Planned Projects</div>
