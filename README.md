@@ -185,9 +185,7 @@ GovKonek-Flask-Project/
 │       └── images/     # Static images (logo, etc.)
 ├── static/
 │   └── uploads/        # User-uploaded files (ignored by Git)
-├── tests/              # Unit & integration test suite (8 test files)
-├── crash_courses/      # (placeholder — crash course materials)
-└── src/                # (placeholder — future source modules)
+└── tests/              # Unit & integration test suite (8 test files)
 ```
 
 ---

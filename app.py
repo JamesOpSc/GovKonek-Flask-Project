@@ -23,12 +23,11 @@ REFACTORED for testability:
 
 from flask import Flask
 from flask_login import LoginManager
-from config import Config, SECRET_KEY, LOGIN_VIEW
+from config import Config, LOGIN_VIEW
 from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository, BarangayRepository
 from service import AuthService, PostService, VoiceService, ProjectService, DocumentService, BarangayService
 from models import create_user_from_db
 from routes import create_routes
-from file_upload import FileUploadHelper
 
 
 # ===========================================================================
@@ -65,9 +64,6 @@ def _build_services(app, config):
     project_service = ProjectService(project_repo=project_repo)
     document_service = DocumentService(document_repo=document_repo, config=config)
     barangay_service = BarangayService(barangay_repo=barangay_repo)
-
-    # -- helpers ----------------------------------------------------------
-    upload_helper = FileUploadHelper(upload_dir=config.upload_folder)
 
     # -- attach to app ----------------------------------------------------
     app.extensions['config'] = config

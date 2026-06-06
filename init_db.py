@@ -194,16 +194,6 @@ def create_database():
     except sqlite3.OperationalError:
         pass
 
-    # -- Migration: add lat/lng columns for map integration -------------
-    try:
-        cursor.execute("ALTER TABLE projects ADD COLUMN latitude REAL")
-    except sqlite3.OperationalError:
-        pass
-    try:
-        cursor.execute("ALTER TABLE projects ADD COLUMN longitude REAL")
-    except sqlite3.OperationalError:
-        pass
-
     # -- E-Services -----------------------------------------------------
     # Catalog of available barangay e-services (request certificates,
     # file complaints, etc.). is_active toggles service visibility.
