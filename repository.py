@@ -235,13 +235,6 @@ class UserRepository(BaseRepository):
         )
         return self.find_by_id(user_id)
 
-    # -- backward-compatible static interface -----------------------------
-
-    @staticmethod
-    def get_db_connection():
-        """Legacy: create a connection using the default database."""
-        return _connect(DATABASE_NAME)
-
 
 # ===========================================================================
 # PostRepository
@@ -427,13 +420,6 @@ class PostRepository(BaseRepository):
                 (post_id, user_id, emoji)
             )
             return 'added', emoji
-
-    # -- backward-compatible static interface -----------------------------
-
-    @staticmethod
-    def get_db_connection():
-        """Legacy: create a connection using the default database."""
-        return _connect(DATABASE_NAME)
 
 
 # ===========================================================================
