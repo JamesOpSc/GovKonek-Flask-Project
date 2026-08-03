@@ -18,7 +18,11 @@ tables_sql = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
-        role TEXT NOT NULL)''',
+        role TEXT NOT NULL,
+        email TEXT DEFAULT '',
+        address TEXT DEFAULT '',
+        phone_number TEXT DEFAULT '',
+        profile_picture TEXT DEFAULT '')''',
     '''CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         publisher_id INTEGER NOT NULL,

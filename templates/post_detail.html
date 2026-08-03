@@ -227,10 +227,10 @@
 
     <!-- Reactions -->
     <div class="reaction-section" id="reactionBar">
-        {% for r in post.reaction_counts %}
-        <button class="react-btn {% if post.user_reaction == r.emoji %}active{% endif %}"
-                onclick="toggleReaction('{{ r.emoji }}')" title="React {{ r.emoji }}">
-            {{ r.emoji }}<span class="react-count">{{ r.count }}</span>
+        {% for emoji in allowed_emoji %}
+        <button class="react-btn {% if post.user_reaction == emoji %}active{% endif %}"
+                onclick="toggleReaction('{{ emoji }}')" title="React {{ emoji }}">
+            {{ emoji }}<span class="react-count">{{ reaction_map.get(emoji, 0) }}</span>
         </button>
         {% endfor %}
     </div>

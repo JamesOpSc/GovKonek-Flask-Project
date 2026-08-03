@@ -81,9 +81,7 @@ def create_routes(app):
         Login page and form handler.
 
         GET  → renders the login form
-        POST → authenticates credentials, redirects based on user role:
-                - publisher → barangay_landing (their barangay's page)
-                - citizen   → dashboard (the main feed)
+        POST → authenticates credentials, redirects to the dashboard
         """
         if request.method == 'POST':
             username = request.form['username']
@@ -96,12 +94,7 @@ def create_routes(app):
                 # Flask-Login: create session for authenticated user
                 login_user(user)
 
-                # Role-based redirect after login
-                # Publishers are sent to their barangay landing page
-                if user.role == 'publisher':
-                    return redirect(url_for('barangay_landing'))
-
-                # All other users go to the main dashboard
+                # Both publishers and citizens land on the dashboard
                 return redirect(url_for('dashboard'))
             else:
                 flash('Invalid username or password.', 'error')
@@ -402,11 +395,17 @@ def create_routes(app):
         if not detail:
             flash('Post not found.', 'error')
             return redirect(url_for('dashboard'))
+        # Always render the full set of emoji reactions (0-count included) so
+        # users can react to a post even when nobody has reacted yet.
+        allowed_emoji = ['👍', '❤️', '😄', '😢', '😡', '🎉']
+        reaction_map = {r['emoji']: r['count'] for r in detail['reaction_counts']}
         return render_template('post_detail.html',
                                post=detail,
                                name=current_user.username,
                                role=current_user.role,
-                               user_id=current_user.id)
+                               user_id=current_user.id,
+                               allowed_emoji=allowed_emoji,
+                               reaction_map=reaction_map)
 
     @app.route('/barangay/<int:publisher_id>')
     @login_required
