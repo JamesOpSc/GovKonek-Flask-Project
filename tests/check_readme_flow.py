@@ -22,7 +22,8 @@ tables_sql = [
         email TEXT DEFAULT '',
         address TEXT DEFAULT '',
         phone_number TEXT DEFAULT '',
-        profile_picture TEXT DEFAULT '')''',
+        profile_picture TEXT DEFAULT '',
+        barangay TEXT DEFAULT '')''',
     '''CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         publisher_id INTEGER NOT NULL,

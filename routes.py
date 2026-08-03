@@ -39,6 +39,15 @@ def _get_services():
     }
 
 
+def _barangay_display_name(barangay):
+    """
+    Return a barangay's name without a leading 'Barangay ' prefix so that
+    templates can render 'Barangay <Name>' without doubling the word.
+    """
+    name = (barangay or {}).get('name') or 'Barangay'
+    return name[9:] if name.lower().startswith('barangay ') else name
+
+
 def create_routes(app):
     """
     Factory function to register all routes with the Flask app.
@@ -56,16 +65,30 @@ def create_routes(app):
 
         GET  → renders the registration form
         POST → validates form data, creates user, redirects to login
+
+        The user's selected barangay is saved on the account so the app
+        can resolve their barangay dynamically (e.g. /barangay/view/<slug>)
+        instead of falling back to a hardcoded default.
         """
+        svc = _get_services()
+        # Dynamic barangay dropdown — real barangays from the DB when available.
+        # Gracefully degrade if the barangays table is missing (e.g. minimal DBs).
+        barangays = []
+        try:
+            all_barangays = svc['barangay_repo'].get_all()
+            barangays = [b for b in all_barangays if b.get('publisher_id') is not None]
+        except Exception:
+            barangays = []
+
         if request.method == 'POST':
             # Extract form fields
             username = request.form['username']
             password = request.form['password']
             role = request.form['role']
+            barangay = request.form.get('barangay', '')
 
             # Delegate to AuthService for validation and user creation
-            svc = _get_services()
-            success, message = svc['auth'].register_user(username, password, role)
+            success, message = svc['auth'].register_user(username, password, role, barangay)
 
             if success:
                 flash(message, 'success')
@@ -73,54 +96,81 @@ def create_routes(app):
             else:
                 flash(message, 'error')
 
-        return render_template('register.html')
+        return render_template('register.html', barangays=barangays)
     
     @app.route('/barangay/my-hub')
     @login_required
     def my_barangay_hub():
-        """Automatically resolves the logged-in user's neighborhood without throwing a 404."""
-        # Detect what your User object uses for its neighborhood string safely
-        user_b = getattr(current_user, 'barangay', None) or getattr(current_user, 'barangay_name', None) or 'Payatas'
-        
-        # Format it into a clean slug and redirect to the dynamic hub viewer
-        slug = user_b.lower().replace(' ', '-')
+        """
+        Resolves the logged-in user's barangay dynamically and redirects to
+        its landing page (/barangay/view/<slug>).
+
+        Resolution order:
+          1. Publisher → their own barangay record (barangays.publisher_id)
+          2. The barangay chosen at registration (users.barangay)
+          3. Fallback: the first barangay in the database
+        """
+        svc = _get_services()
+
+        barangay = None
+        if current_user.role == 'publisher':
+            barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+
+        name = (barangay or {}).get('name') if barangay else ''
+        if not name:
+            name = getattr(current_user, 'barangay', '') or ''
+        if not name:
+            first = svc['barangay_repo'].get_first()
+            name = (first or {}).get('name') or 'Payatas'
+
+        slug = name.lower().replace(' ', '-')
         return redirect(f'/barangay/view/{slug}')
 
 
     @app.route('/barangay/view/<barangay_slug>')
     @login_required
     def barangay_hub(barangay_slug):
-        """Renders the landing page safely, even if database tables are named differently."""
-        clean_name = barangay_slug.replace('-', ' ').title()
-        
-        import sqlite3
-        conn = sqlite3.connect('govkonek.db')
-        conn.row_factory = sqlite3.Row
-        
-        # 1. Safely fetch barangay details
-        try:
-            details = conn.execute('SELECT * FROM barangays WHERE name = ?', (clean_name,)).fetchone()
-        except sqlite3.OperationalError:
-            details = None
+        """
+        Renders a barangay's landing page from its name slug.
 
-        # 2. Safely fetch announcements/posts using fallback table names
-        posts = []
-        table_names_to_try = ['announcements', 'posts', 'announcement', 'news']
-        
-        for table in table_names_to_try:
-            try:
-                posts = conn.execute(f'SELECT * FROM {table} WHERE barangay_name = ? ORDER BY id DESC', (clean_name,)).fetchall()
-                break # If it successfully fetches without throwing an error, stop looking!
-            except sqlite3.OperationalError:
-                continue # If the table name doesn't exist, try the next one
-                
-        conn.close()
-        
+        The slug is derived from the real barangay name (e.g. 'Barangay
+        Bagong Silangan' -> 'barangay-bagong-silangan'), so we resolve it
+        against the barangays table instead of hardcoding any location.
+        """
+        svc = _get_services()
+
+        def _slugify(name):
+            return (name or '').lower().replace(' ', '-').replace(',', '')
+
+        target = _slugify(barangay_slug)
+
+        # Resolve the slug against real barangay records
+        barangay = None
+        for b in svc['barangay_repo'].get_all():
+            if _slugify(b.get('name')) == target:
+                barangay = b
+                break
+        if not barangay:
+            barangay = svc['barangay_repo'].get_first()
+
+        # Announcements published by this barangay's captain
+        announcements = []
+        if barangay and barangay.get('publisher_id'):
+            posts = svc['post_repo'].get_posts_by_publisher(barangay['publisher_id'])
+            announcements = [dict(p) for p in posts]
+
+        projects = svc['project_repo'].get_all()
+
         return render_template(
-            'barangay_landing.html', 
-            barangay_name=clean_name, 
-            details=details, 
-            posts=posts
+            'barangay_landing.html',
+            barangay_name=_barangay_display_name(barangay),
+            barangay=barangay,
+            details=barangay,
+            announcements=announcements,
+            projects=projects,
+            is_owner=False,
+            name=current_user.username,
+            role=current_user.role,
         )
 
     @app.route('/login', methods=['GET', 'POST'])
@@ -360,6 +410,7 @@ def create_routes(app):
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
+                               barangay_name=_barangay_display_name(barangay),
                                is_owner=is_owner,
                                projects=projects,
                                announcements=announcements)
@@ -384,6 +435,7 @@ def create_routes(app):
                                name=current_user.username,
                                role=current_user.role,
                                barangay=barangay,
+                               barangay_name=_barangay_display_name(barangay),
                                is_owner=is_owner,
                                projects=projects,
                                announcements=announcements)

@@ -179,7 +179,8 @@ class TestUserRepository(unittest.TestCase):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
+                role TEXT NOT NULL,
+                barangay TEXT DEFAULT ''
             )
         ''')
 
@@ -253,7 +254,8 @@ class TestPostRepository(unittest.TestCase):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
+                role TEXT NOT NULL,
+                barangay TEXT DEFAULT ''
             )
         ''')
         self.repo._execute_write('''

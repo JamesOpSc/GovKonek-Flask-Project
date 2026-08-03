@@ -125,7 +125,7 @@ class AuthService(BaseService):
 
     # -- public API -------------------------------------------------------
 
-    def register_user(self, username, password, role):
+    def register_user(self, username, password, role, barangay=''):
         """
         Register a new user account.
 
@@ -135,6 +135,7 @@ class AuthService(BaseService):
         @param username: Desired login name (must be unique)
         @param password: Plain-text password (hashed before storage)
         @param role: User role — 'citizen' or 'publisher'
+        @param barangay: User's barangay (e.g. 'Payatas', 'Bagong Silangan')
         @return: (success: bool, message: str)
         """
         try:
@@ -151,7 +152,7 @@ class AuthService(BaseService):
 
         # Hash the password for secure storage (never store plain text!)
         hashed_password = generate_password_hash(password)
-        if self._user_repo.create(username, hashed_password, role):
+        if self._user_repo.create(username, hashed_password, role, barangay):
             return True, "Registration successful! Please log in."
         return False, "Registration failed"
 
