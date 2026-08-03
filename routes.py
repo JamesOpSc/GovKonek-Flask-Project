@@ -74,6 +74,54 @@ def create_routes(app):
                 flash(message, 'error')
 
         return render_template('register.html')
+    
+    @app.route('/barangay/my-hub')
+    @login_required
+    def my_barangay_hub():
+        """Automatically resolves the logged-in user's neighborhood without throwing a 404."""
+        # Detect what your User object uses for its neighborhood string safely
+        user_b = getattr(current_user, 'barangay', None) or getattr(current_user, 'barangay_name', None) or 'Payatas'
+        
+        # Format it into a clean slug and redirect to the dynamic hub viewer
+        slug = user_b.lower().replace(' ', '-')
+        return redirect(f'/barangay/view/{slug}')
+
+
+    @app.route('/barangay/view/<barangay_slug>')
+    @login_required
+    def barangay_hub(barangay_slug):
+        """Renders the landing page safely, even if database tables are named differently."""
+        clean_name = barangay_slug.replace('-', ' ').title()
+        
+        import sqlite3
+        conn = sqlite3.connect('govkonek.db')
+        conn.row_factory = sqlite3.Row
+        
+        # 1. Safely fetch barangay details
+        try:
+            details = conn.execute('SELECT * FROM barangays WHERE name = ?', (clean_name,)).fetchone()
+        except sqlite3.OperationalError:
+            details = None
+
+        # 2. Safely fetch announcements/posts using fallback table names
+        posts = []
+        table_names_to_try = ['announcements', 'posts', 'announcement', 'news']
+        
+        for table in table_names_to_try:
+            try:
+                posts = conn.execute(f'SELECT * FROM {table} WHERE barangay_name = ? ORDER BY id DESC', (clean_name,)).fetchall()
+                break # If it successfully fetches without throwing an error, stop looking!
+            except sqlite3.OperationalError:
+                continue # If the table name doesn't exist, try the next one
+                
+        conn.close()
+        
+        return render_template(
+            'barangay_landing.html', 
+            barangay_name=clean_name, 
+            details=details, 
+            posts=posts
+        )
 
     @app.route('/login', methods=['GET', 'POST'])
     def login():
