@@ -11,15 +11,21 @@ REFACTORED for testability:
     - In tests, inject mock services into app.extensions before calling routes.
 """
 
+import sqlite3
+
+import requests
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
+from exceptions import DatabaseError
 from file_upload import get_upload_helper
 
 
 def _get_services():
     """
-    Convenience helper: fetch injected services from the Flask app.
-    Returns a dict with keys: auth, posts, post_repo, project_repo, service_repo, document_repo, voice, voice_repo.
+    Convenience helper: fetch injected services and repositories from the
+    Flask app. Returns a dict keyed by: auth, posts, post_repo, user_repo,
+    project_repo, project_service, service_repo, document_repo,
+    document_service, voice, voice_repo, barangay_repo, barangay_service.
     """
     ext = current_app.extensions
     return {
@@ -46,6 +52,26 @@ def _barangay_display_name(barangay):
     """
     name = (barangay or {}).get('name') or 'Barangay'
     return name[9:] if name.lower().startswith('barangay ') else name
+
+
+def _project_payload(data):
+    """
+    Extract the shared project fields from a JSON payload.
+
+    DRY: both api_create_project and api_update_project read the same
+    fields, so the extraction lives in one place (thin-route principle).
+    """
+    data = data or {}
+    return {
+        'title': data.get('title', ''),
+        'description': data.get('description', ''),
+        'status': data.get('status', 'ongoing'),
+        'budget': data.get('budget', 0),
+        'location': data.get('location', ''),
+        'image_url': data.get('image_url', ''),
+        'start_date': data.get('start_date', ''),
+        'end_date': data.get('end_date', ''),
+    }
 
 
 def create_routes(app):
@@ -77,7 +103,8 @@ def create_routes(app):
         try:
             all_barangays = svc['barangay_repo'].get_all()
             barangays = [b for b in all_barangays if b.get('publisher_id') is not None]
-        except Exception:
+        except (DatabaseError, sqlite3.Error):
+            # Gracefully degrade if the barangays table is missing (e.g. minimal DBs)
             barangays = []
 
         if request.method == 'POST':
@@ -572,19 +599,12 @@ def create_routes(app):
     @login_required
     def api_create_project():
         """API: Create a new project. ONLY publisher (barangay captain) can create."""
-        data = request.get_json()
-        title = data.get('title', '') if data else ''
-        description = data.get('description', '') if data else ''
-        status = data.get('status', 'ongoing') if data else 'ongoing'
-        budget = data.get('budget', 0) if data else 0
-        location = data.get('location', '') if data else ''
-        image_url = data.get('image_url', '') if data else ''
-        start_date = data.get('start_date', '') if data else ''
-        end_date = data.get('end_date', '') if data else ''
+        payload = _project_payload(request.get_json())
         svc = _get_services()
         project, error = svc['project_service'].create_project(
-            current_user, title, description, status,
-            budget, location, image_url, start_date, end_date
+            current_user, payload['title'], payload['description'], payload['status'],
+            payload['budget'], payload['location'], payload['image_url'],
+            payload['start_date'], payload['end_date']
         )
         if error:
             return jsonify({'error': error}), 403
@@ -594,19 +614,12 @@ def create_routes(app):
     @login_required
     def api_update_project(project_id):
         """API: Update a project. ONLY the publisher who created it can edit."""
-        data = request.get_json()
-        title = data.get('title', '') if data else ''
-        description = data.get('description', '') if data else ''
-        status = data.get('status', 'ongoing') if data else 'ongoing'
-        budget = data.get('budget', 0) if data else 0
-        location = data.get('location', '') if data else ''
-        image_url = data.get('image_url', '') if data else ''
-        start_date = data.get('start_date', '') if data else ''
-        end_date = data.get('end_date', '') if data else ''
+        payload = _project_payload(request.get_json())
         svc = _get_services()
         project, error = svc['project_service'].update_project(
-            current_user, project_id, title, description, status,
-            budget, location, image_url, start_date, end_date
+            current_user, project_id, payload['title'], payload['description'], payload['status'],
+            payload['budget'], payload['location'], payload['image_url'],
+            payload['start_date'], payload['end_date']
         )
         if error:
             return jsonify({'error': error}), 403
@@ -742,8 +755,6 @@ def create_routes(app):
 
         Query params: lat (float), lon (float)
         """
-        import requests
-
         # Parse and validate coordinate parameters
         lat = request.args.get('lat', type=float)
         lon = request.args.get('lon', type=float)

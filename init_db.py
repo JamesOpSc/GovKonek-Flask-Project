@@ -118,8 +118,8 @@ def create_database():
         pass
 
 # ===================================================================
-    # INTERACTION TABLES
-    # ===================================================================
+# INTERACTION TABLES
+# ===================================================================
 
     # -- Comments --------------------------------------------------------
     # Stores user comments on announcement posts.
@@ -284,8 +284,8 @@ def create_database():
     ''')
 
 # ===================================================================
-    # BARANGAY LANDING PAGE TABLES
-    # ===================================================================
+# BARANGAY LANDING PAGE TABLES
+# ===================================================================
 
     # -- Barangays (configurable landing page per barangay) ---------------
     # Each barangay captain can create their own landing page with

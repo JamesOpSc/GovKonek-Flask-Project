@@ -17,8 +17,12 @@ REFACTORED for testability:
     - In tests, inject mock repositories to isolate business logic from the database.
 """
 
+import os
+from datetime import date
+
 from abc import ABC
 from werkzeug.security import generate_password_hash, check_password_hash
+from file_upload import FileUploadHelper
 from repository import (
     UserRepository, PostRepository, ProjectRepository,
     DocumentRepository, VoiceRepository, BarangayRepository
@@ -80,8 +84,8 @@ class BaseService(ABC):
         @param value: The value to validate
         @param field_name: Human-readable field name
         @param allowed: Iterable of allowed values
-        @raises InvalidValueError: if value is not in allowed set
-        @return: The value if valid (or the first allowed value as default)
+        @return: The value if valid, otherwise the first allowed value as a
+                 safe default (lenient fallback — this helper never raises)
         """
         if value not in allowed:
             # Default to first allowed value instead of raising
@@ -654,13 +658,21 @@ class DocumentService(BaseService):
         'Procurement', 'Disaster Preparedness', 'General'
     ]
 
-    def __init__(self, document_repo=None, config=None):
+    def __init__(self, document_repo=None, config=None, upload_helper=None):
         """
         @param document_repo: DocumentRepository instance (injected)
         @param config: Config instance (for upload_folder and allowed_extensions)
+        @param upload_helper: FileUploadHelper instance (injected). Defaults to
+                              a helper built from `config` so document uploads
+                              reuse the same file-handling logic as post and
+                              profile uploads (DRY — no duplicated save logic).
         """
         self._repo = document_repo or DocumentRepository()
         self._config = config
+        self._upload_helper = upload_helper or FileUploadHelper(
+            upload_dir=config.upload_folder if config else 'static/uploads',
+            allowed_extensions=config.allowed_extensions if config else None
+        )
 
     # -- read (all users) ------------------------------------------------
 
@@ -700,64 +712,23 @@ class DocumentService(BaseService):
         """
         return self._repo.get_by_id(document_id)
 
-    # -- file validation -------------------------------------------------
+    # -- file helpers ----------------------------------------------------
 
-    def _validate_file(self, file):
+    @staticmethod
+    def _format_file_size(size_bytes):
         """
-        Validate an uploaded file.
+        Format a raw byte count into a human-readable file size string.
 
-        EXCEPTION HANDLING (from lecture):
-          - Checks if a file was actually provided
-          - Validates the file extension against the allowed set
-          - Returns a user-friendly error message
+        Uses binary thresholds: < 1024 B, < 1024 KB, >= 1024 KB → MB.
 
-        @param file: Flask FileStorage object from request.files
-        @return: (filename, error) — error is None if valid
+        @param size_bytes: Raw file size in bytes
+        @return: Human-readable size string (e.g., '2.4 MB')
         """
-        if not file or file.filename == '':
-            return None, "No file was selected."
-
-        filename = file.filename
-        if '.' not in filename:
-            return None, "File must have an extension."
-
-        ext = filename.rsplit('.', 1)[1].lower()
-        allowed = self._config.allowed_extensions if self._config else {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'txt', 'csv'}
-
-        if ext not in allowed:
-            return None, f"File type '.{ext}' is not allowed. Allowed: {', '.join(sorted(allowed))}"
-
-        return filename, None
-
-    def _save_file(self, file, filename):
-        """
-        Save an uploaded file with a unique name to prevent overwrites.
-
-        Uses a timestamp prefix (YYYYMMDD_HHMMSS) to avoid filename collisions
-        when multiple users upload files with the same name.
-
-        @param file: Flask FileStorage object (already validated)
-        @param filename: Original filename from the user
-        @return: Relative URL path to the saved file (e.g., '/static/uploads/20260604_abc_report.pdf')
-        """
-        import os
-        from datetime import datetime
-
-        upload_folder = self._config.upload_folder if self._config else 'static/uploads'
-
-        # Ensure the upload directory exists (create if not)
-        os.makedirs(upload_folder, exist_ok=True)
-
-        # Generate unique filename: timestamp_originalname
-        # Example: 20260604_143052_Q1_Budget_Report.pdf
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        safe_name = f"{timestamp}_{filename}"
-
-        filepath = os.path.join(upload_folder, safe_name)
-        file.save(filepath)
-
-        # Return the relative URL for storage in the database and serving
-        return f'/static/uploads/{safe_name}'
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        if size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
     # -- publisher-only mutations ----------------------------------------
 
@@ -793,38 +764,28 @@ class DocumentService(BaseService):
         if category not in self.VALID_CATEGORIES:
             category = 'General'
 
-        # Validate file exists and has an allowed extension
-        filename, error = self._validate_file(file)
-        if error:
-            return None, error
+        # Validate + save the file via the shared FileUploadHelper.
+        # EXCEPTION HANDLING: ValueError (no file / bad extension) is converted
+        # into a user-friendly error message instead of crashing the request.
+        try:
+            file_url = self._upload_helper.save(file, prefix='doc')
+        except ValueError as e:
+            return None, str(e)
 
         # Calculate file size for display in the UI
-        import os
         file.seek(0, os.SEEK_END)  # Move to end to get total size
         file_size_bytes = file.tell()
         file.seek(0)  # Reset to beginning so .save() works correctly
-
-        # Format file size for human-readable display
-        # Uses binary thresholds: < 1024 B, < 1024 KB, >= 1024 KB → MB
-        if file_size_bytes < 1024:
-            file_size = f"{file_size_bytes} B"
-        elif file_size_bytes < 1024 * 1024:
-            file_size = f"{file_size_bytes / 1024:.1f} KB"
-        else:
-            file_size = f"{file_size_bytes / (1024 * 1024):.1f} MB"
-
-        # Save file to disk (returns relative URL like /static/uploads/20260604_report.pdf)
-        file_url = self._save_file(file, filename)
+        file_size = self._format_file_size(file_size_bytes)
 
         # Use today's date if the publisher didn't specify one
         if not published_date:
-            from datetime import date
             published_date = date.today().isoformat()
 
         # Persist document metadata to the database
         doc = self._repo.create(
-            title=title.strip(),
-            description=description.strip(),
+            title=self._sanitize(title),
+            description=self._sanitize(description),
             category=category,
             file_url=file_url,
             file_size=file_size,
@@ -847,8 +808,6 @@ class DocumentService(BaseService):
         @param document_id: ID of the document to delete
         @return: (success: bool, error)
         """
-        import os
-
         # Authorization check
         if not user.can_publish():
             return False, "Only the Barangay Captain can delete documents."
@@ -858,21 +817,10 @@ class DocumentService(BaseService):
         if not doc:
             return False, "Document not found."
 
-        # Step 1: Delete the physical file from disk
+        # Step 1: Delete the physical file from disk (shared FileUploadHelper).
+        # delete() safely no-ops for empty, '#', or already-missing files.
         file_url = doc.get('file_url', '')
-        if file_url and file_url != '#':
-            # Convert relative URL (e.g., /static/uploads/report.pdf)
-            # to an absolute filesystem path.
-            # __file__ is service.py → dirname(__file__) is the project root
-            project_root = os.path.dirname(os.path.abspath(__file__))
-            file_path = os.path.join(project_root, file_url.lstrip('/'))
-            try:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-            except OSError:
-                # File already deleted or permission issue — non-critical,
-                # proceed with database cleanup anyway
-                pass
+        self._upload_helper.delete(file_url)
 
         # Step 2: Delete the database record
         self._repo.delete(document_id, user.id)
@@ -975,15 +923,15 @@ class BarangayService(BaseService):
             return None, "You already manage a barangay. Edit it instead."
 
         barangay = self._repo.create(
-            name=name.strip(),
-            description=description.strip() if description else '',
-            address=address.strip() if address else '',
-            phone=phone.strip() if phone else '',
-            email=email.strip() if email else '',
-            facebook=facebook.strip() if facebook else '',
+            name=self._sanitize(name),
+            description=self._sanitize(description),
+            address=self._sanitize(address),
+            phone=self._sanitize(phone),
+            email=self._sanitize(email),
+            facebook=self._sanitize(facebook),
             office_hours_weekday=office_hours_weekday,
             office_hours_saturday=office_hours_saturday,
-            motto=motto.strip() if motto else '',
+            motto=self._sanitize(motto),
             latitude=latitude,
             longitude=longitude,
             publisher_id=user.id

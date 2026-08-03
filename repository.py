@@ -9,8 +9,7 @@ All database queries are centralized in one place for easier maintenance and tes
 REFACTORED for testability:
     - Each repository accepts a `db_path` in its constructor (dependency injection).
     - Instance methods use `self._db_path` instead of a module-level global.
-    - In tests, inject `':memory:'` to get an isolated database.
-    - Backward-compatible static methods delegate to a default singleton instance.
+    - In tests, inject `':memory:'` (or a temp file) to get an isolated database.
 
 OOP PRINCIPLES DEMONSTRATED:
     - INHERITANCE: All repositories extend BaseRepository (like Vehicle → Car/Truck)
@@ -23,7 +22,7 @@ import sqlite3
 from abc import ABC
 from config import DATABASE_NAME
 from exceptions import (
-    DatabaseError, ConnectionError, RecordNotFoundError, DuplicateRecordError
+    DatabaseError, ConnectionError, DuplicateRecordError
 )
 
 
@@ -189,9 +188,8 @@ class UserRepository(BaseRepository):
     INHERITANCE: Extends BaseRepository — inherits __init__, _get_db,
     _execute, and _execute_write. Only defines user-specific queries.
 
-    REFACTORED: Now instance-based. Pass `db_path` to the constructor.
-    For backward compatibility, static methods still work using the default
-    module-level singleton `_default_user_repo`.
+    REFACTORED: Now instance-based. Pass `db_path` to the constructor
+    (e.g., ':memory:' in tests). All methods are instance methods.
     """
 
     # -- user CRUD --------------------------------------------------------
