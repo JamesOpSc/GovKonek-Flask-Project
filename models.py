@@ -30,18 +30,20 @@ class User(UserMixin, ABC):
         - ABC (Abstract Base Class): Prevents direct instantiation of User class
     """
     
-    def __init__(self, id, username, role):
+    def __init__(self, id, username, role, barangay=''):
         """
         Initialize a new User with basic information.
-        
+
         @param id: Unique user identifier from database
         @param username: User's login name
         @param role: User's role in the system ('citizen' or 'publisher')
+        @param barangay: User's barangay (e.g. 'Payatas', 'Bagong Silangan')
         """
         # Private attributes - use underscore prefix to indicate they're internal
         self._id = id
         self._username = username
         self._role = role
+        self._barangay = barangay or ''
     
     # ENCAPSULATION: Properties provide controlled access to private attributes
     
@@ -71,6 +73,15 @@ class User(UserMixin, ABC):
         @return: The user's role ('citizen' or 'publisher')
         """
         return self._role
+
+    @property
+    def barangay(self):
+        """
+        Read-only property for the user's barangay.
+        ENCAPSULATION: Prevents modification of barangay after creation.
+        @return: The user's barangay name (may be empty string)
+        """
+        return self._barangay
     
     # ABSTRACTION: Abstract methods define what subclasses must implement
     
@@ -182,8 +193,9 @@ def create_user_from_db(user_data):
     @param user_data: SQLite Row object containing user database record
     @return: CitizenUser or PublisherUser instance based on role in database
     """
+    barangay = user_data['barangay'] if 'barangay' in user_data.keys() else ''
     if user_data['role'] == 'publisher':
-        return PublisherUser(user_data['id'], user_data['username'], user_data['role'])
+        return PublisherUser(user_data['id'], user_data['username'], user_data['role'], barangay)
     else:
         # Default to citizen for any other role
-        return CitizenUser(user_data['id'], user_data['username'], user_data['role'])
+        return CitizenUser(user_data['id'], user_data['username'], user_data['role'], barangay)

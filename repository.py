@@ -208,7 +208,7 @@ class UserRepository(BaseRepository):
             'SELECT * FROM users WHERE username = ?', (username,), fetch='one'
         )
 
-    def create(self, username, hashed_password, role):
+    def create(self, username, hashed_password, role, barangay=''):
         """
         Insert a new user. Returns True on success, False on duplicate.
 
@@ -217,8 +217,8 @@ class UserRepository(BaseRepository):
         """
         try:
             self._execute_write(
-                'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-                (username, hashed_password, role)
+                'INSERT INTO users (username, password_hash, role, barangay) VALUES (?, ?, ?, ?)',
+                (username, hashed_password, role, barangay)
             )
             return True
         except DuplicateRecordError:

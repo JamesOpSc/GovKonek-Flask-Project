@@ -88,13 +88,14 @@ def create_database():
         pass  # column already exists
 
     # -- Migration: user profile fields ----------------------------------
-    # email, address, phone_number, profile_picture were added after
-    # the initial users table was created.
+    # email, address, phone_number, profile_picture, barangay were added
+    # after the initial users table was created.
     for col, col_def in [
         ('email', "TEXT DEFAULT ''"),
         ('address', "TEXT DEFAULT ''"),
         ('phone_number', "TEXT DEFAULT ''"),
         ('profile_picture', "TEXT DEFAULT ''"),
+        ('barangay', "TEXT DEFAULT ''"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {col_def}")

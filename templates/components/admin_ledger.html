@@ -213,8 +213,8 @@
                             <td style="font-weight:600;">${escapeHtml(p.title)}</td>
                             <td style="color:#64748b;">${formatDateShort(p.created_at)}</td>
                             <td>
-                                <button class="btn-action" onclick="openEditModal(${p.id}, '${escapeJs(p.title)}', '${escapeJs(p.content)}', '${escapeJs(p.category || '')}')">✏️ Edit</button>
-                                <button class="btn-action delete" onclick="confirmDelete(${p.id}, '${escapeJs(p.title)}')">🗑️ Delete</button>
+                                <button class="btn-action edit" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}" data-content="${escapeHtml(p.content)}" data-category="${escapeHtml(p.category || '')}">✏️ Edit</button>
+                                <button class="btn-action delete" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}">🗑️ Delete</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -297,7 +297,7 @@
             if (data.error) {
                 showToast(data.error, 'error');
             } else {
-                showToast(editingPostId ? 'Announcement updated!' : 'Announcement published!', 'success');
+                showToast(editingPostId ? 'Announcement updated!' : 'Post Published!', 'success');
                 closeModal();
                 loadLedger();
                 // Refresh feed if on dashboard
@@ -345,10 +345,9 @@
     function escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str || '';
-        return div.innerHTML;
-    }
-    function escapeJs(str) {
-        return (str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        // innerHTML does NOT escape quotes in text content, so escape them
+        // explicitly — required when the value lands in an HTML attribute.
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
     function formatDateShort(dateStr) {
         if (!dateStr) return '';
@@ -356,6 +355,27 @@
         return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) +
                ', ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     }
+
+    // Event delegation for Edit/Delete buttons.
+    // Using data-* attributes (escaped via escapeHtml) instead of inline
+    // onclick avoids broken handlers when titles contain quotes or HTML.
+    const ledgerContent = document.getElementById('ledgerContent');
+    ledgerContent.addEventListener('click', function(e) {
+        const editBtn = e.target.closest('.btn-action.edit');
+        if (editBtn) {
+            openEditModal(
+                parseInt(editBtn.dataset.postId, 10),
+                editBtn.dataset.title,
+                editBtn.dataset.content,
+                editBtn.dataset.category
+            );
+            return;
+        }
+        const delBtn = e.target.closest('.btn-action.delete');
+        if (delBtn) {
+            confirmDelete(parseInt(delBtn.dataset.postId, 10), delBtn.dataset.title);
+        }
+    });
 
     // Initial load
     loadLedger();

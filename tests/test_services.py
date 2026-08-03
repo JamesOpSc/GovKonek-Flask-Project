@@ -117,7 +117,8 @@ class TestAuthService(unittest.TestCase):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
+                role TEXT NOT NULL,
+                barangay TEXT DEFAULT ''
             )
         ''')
         self.svc = AuthService(user_repo=self.repo)
@@ -189,7 +190,8 @@ class TestPostService(unittest.TestCase):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
+                role TEXT NOT NULL,
+                barangay TEXT DEFAULT ''
             )
         ''')
         self.repo._execute_write('''

@@ -15,7 +15,8 @@ c.execute('''CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    role TEXT NOT NULL)''')
+    role TEXT NOT NULL,
+    barangay TEXT DEFAULT '')''')
 c.execute('''CREATE TABLE IF NOT EXISTS documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,

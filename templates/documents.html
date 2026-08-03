@@ -255,7 +255,9 @@
     function escapeHtml(s) {
         const d = document.createElement('div');
         d.textContent = s || '';
-        return d.innerHTML;
+        // innerHTML does NOT escape quotes in text content, so escape them
+        // explicitly — required when the value lands in an HTML attribute.
+        return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function getDocIcon(cat) {
@@ -325,10 +327,11 @@
             card.style.display = show ? '' : 'none';
         });
 
-        // Update visible count
-        const visible = document.querySelectorAll('.doc-card[style*="display:"]').length;
+        // Update visible count (count cards actually shown, not hidden ones)
         const total = document.querySelectorAll('.doc-card').length;
-        document.getElementById('countTotal').textContent = visible || total;
+        const visible = Array.from(document.querySelectorAll('.doc-card'))
+            .filter(c => c.style.display !== 'none').length;
+        document.getElementById('countTotal').textContent = visible;
     }
 
     fetch('/api/documents')

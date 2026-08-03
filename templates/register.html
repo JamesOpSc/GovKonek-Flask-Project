@@ -200,7 +200,8 @@
                 </select>
             </div>
 
-            <!-- ADDED: BARANGAY SELECTION DROPDOWN -->
+            <!-- BARANGAY SELECTION DROPDOWN (selection is saved on the account
+                 and used to resolve /barangay/view/<slug> dynamically) -->
             <div class="form-group">
                 <label for="barangay">Your Barangay (Quezon City)</label>
                 <select id="barangay" name="barangay" class="form-input" required>
@@ -208,6 +209,11 @@
                     <option value="Payatas">Payatas</option>
                     <option value="Bagong Silangan">Bagong Silangan</option>
                     <option value="Batasan Hills">Batasan Hills</option>
+                    {% for b in barangays %}
+                        {% if b.name not in ['Payatas', 'Bagong Silangan', 'Batasan Hills'] %}
+                        <option value="{{ b.name }}">{{ b.name }}</option>
+                        {% endif %}
+                    {% endfor %}
                 </select>
             </div>
 
