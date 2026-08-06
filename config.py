@@ -57,7 +57,10 @@ class Config:
             'GOVKONEK_UPLOAD_FOLDER',
             os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
         )
-        self._allowed_extensions = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'txt', 'csv'}
+        # ENCAPSULATION: frozen — callers get a copy via the property
+        self._allowed_extensions = frozenset(
+            {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpg', 'jpeg', 'txt', 'csv'}
+        )
 
     # ===================================================================
     # ENCAPSULATION: @property accessors (read-only)
@@ -126,8 +129,9 @@ class Config:
         """
         Read-only access to the set of allowed file extensions.
 
-        ENCAPSULATION: Prevents bypassing file type validation.
-        @return: Set of allowed lowercase extensions (e.g., {'pdf', 'docx'})
+        ENCAPSULATION: Returns a frozen copy so callers cannot mutate the
+        internal set via `config.allowed_extensions.add('exe')`.
+        @return: frozenset of allowed lowercase extensions (e.g., {'pdf', 'docx'})
         """
         return self._allowed_extensions
 

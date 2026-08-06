@@ -46,9 +46,12 @@ class FileUploadHelper:
                            Defaults to 'static/uploads'.
         @param allowed_extensions: Set of lowercase file extensions to allow.
                                    Defaults to ALLOWED_IMAGE_EXTENSIONS.
+                                   Stored as frozenset (ENCAPSULATION — callers
+                                   cannot mutate via .add()).
         """
         self._upload_dir = upload_dir or 'static/uploads'
-        self._allowed_extensions = allowed_extensions or self.ALLOWED_IMAGE_EXTENSIONS
+        _exts = allowed_extensions or self.ALLOWED_IMAGE_EXTENSIONS
+        self._allowed_extensions = frozenset(_exts)
 
     # -- public API -------------------------------------------------------
 

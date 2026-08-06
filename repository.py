@@ -139,6 +139,11 @@ class BaseRepository(ABC):
         """
         Execute a query with automatic exception handling.
 
+        REFACTORED to use DBContext (from the crash course hardware_layer.py
+        pattern: `with sqlite3.connect(...) as connection:`). This centralizes
+        connection lifecycle, rollback, and close in one place (DRY) while
+        preserving the original exception translation to domain errors.
+
         EXCEPTION HANDLING (from lecture): Wraps sqlite3 errors in
         domain-specific DatabaseError, providing meaningful context.
 
@@ -148,26 +153,27 @@ class BaseRepository(ABC):
         @param commit: If True, commit after executing
         @return: Fetched rows, or cursor for non-fetch operations
         """
-        conn = self._get_db()
         try:
-            cursor = conn.execute(query, params)
-            if commit:
-                conn.commit()
-            if fetch == 'all':
-                return cursor.fetchall()
-            elif fetch == 'one':
-                return cursor.fetchone()
-            return cursor
+            with DBContext(self._db_path) as conn:
+                cursor = conn.execute(query, params)
+                if commit:
+                    conn.commit()
+                if fetch == 'all':
+                    return cursor.fetchall()
+                elif fetch == 'one':
+                    return cursor.fetchone()
+                return cursor
         except sqlite3.IntegrityError as e:
             raise DuplicateRecordError(
                 entity='record', field='constraint', value=str(params)
             ) from e
         except sqlite3.Error as e:
+            # ConnectionError (raised by DBContext.__enter__) is a subclass
+            # of DatabaseError and is not a sqlite3.Error, so it propagates
+            # unwrapped — callers get the richer db_path context.
             raise DatabaseError(
                 f"Query failed: {query[:80]}...", original_error=e
             ) from e
-        finally:
-            conn.close()
 
     def _execute_write(self, query, params=()):
         """
@@ -266,10 +272,13 @@ class PostRepository(BaseRepository):
 
     def update_post(self, post_id, publisher_id, title, content):
         """Update a post. Only the owning publisher can update."""
-        self._execute_write(
+        cursor = self._execute_write(
             'UPDATE posts SET title = ?, content = ? WHERE id = ? AND publisher_id = ?',
             (title, content, post_id, publisher_id)
         )
+        # Ownership gate: if no rows were affected, caller is not the owner (or post doesn't exist)
+        if cursor.rowcount == 0:
+            return None
         post = self._execute('''
             SELECT p.*, u.username as publisher_name
             FROM posts p JOIN users u ON p.publisher_id = u.id
@@ -278,12 +287,12 @@ class PostRepository(BaseRepository):
         return dict(post) if post else None
 
     def delete_post(self, post_id, publisher_id):
-        """Delete a post. Only the owning publisher can delete."""
-        self._execute_write(
+        """Delete a post. Only the owning publisher can delete. Returns rows deleted."""
+        cursor = self._execute_write(
             'DELETE FROM posts WHERE id = ? AND publisher_id = ?',
             (post_id, publisher_id)
         )
-        return True
+        return cursor.rowcount
 
     def get_all_posts(self, search=None, category=None, sort='newest'):
         """
@@ -511,6 +520,8 @@ class ProjectRepository(BaseRepository):
 
         The WHERE clause (id = ? AND publisher_id = ?) acts as an ownership
         gate — if the publisher_id doesn't match, no rows are affected.
+        Now checks rowcount so unauthorized updates return None instead of
+        silently returning the unchanged row (security fix).
 
         @param project_id: Project's primary key
         @param publisher_id: Publisher's user ID for authorization
@@ -526,7 +537,7 @@ class ProjectRepository(BaseRepository):
         @param longitude: Updated GPS longitude
         @return: Updated project dict or None if not found/authorized
         """
-        self._execute_write(
+        cursor = self._execute_write(
             '''UPDATE projects
                SET title = ?, description = ?, status = ?, budget = ?,
                    location = ?, image_url = ?, start_date = ?, end_date = ?,
@@ -535,6 +546,8 @@ class ProjectRepository(BaseRepository):
             (title, description, status, budget, location, image_url,
              start_date, end_date, latitude, longitude, project_id, publisher_id)
         )
+        if cursor.rowcount == 0:
+            return None
         project = self._execute(
             'SELECT * FROM projects WHERE id = ?', (project_id,), fetch='one'
         )
@@ -548,13 +561,13 @@ class ProjectRepository(BaseRepository):
 
         @param project_id: Project's primary key
         @param publisher_id: Publisher's user ID for authorization
-        @return: True (operation is idempotent)
+        @return: Rows deleted (0 if not owner or not found)
         """
-        self._execute_write(
+        cursor = self._execute_write(
             'DELETE FROM projects WHERE id = ? AND publisher_id = ?',
             (project_id, publisher_id)
         )
-        return True
+        return cursor.rowcount
 
 
 # ===========================================================================
@@ -796,13 +809,15 @@ class VoiceRepository(BaseRepository):
 
         @param voice_post_id: Voice post's primary key
         @param status: New status — 'open', 'resolved', or 'closed'
-        @return: True
+        @return: Updated row dict or None if not found
         """
-        self._execute_write(
+        cursor = self._execute_write(
             'UPDATE voice_posts SET status = ? WHERE id = ?',
             (status, voice_post_id)
         )
-        return True
+        if cursor.rowcount == 0:
+            return None
+        return self.get_by_id(voice_post_id)
 
     def delete(self, voice_post_id, user_id):
         """
@@ -812,13 +827,13 @@ class VoiceRepository(BaseRepository):
 
         @param voice_post_id: Voice post's primary key
         @param user_id: Author's user ID for authorization
-        @return: True
+        @return: Rows deleted (0 if not owner or not found)
         """
-        self._execute_write(
+        cursor = self._execute_write(
             'DELETE FROM voice_posts WHERE id = ? AND user_id = ?',
             (voice_post_id, user_id)
         )
-        return True
+        return cursor.rowcount
 
     def get_categories(self):
         """

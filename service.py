@@ -327,7 +327,12 @@ class PostService(BaseService):
             self._check_publisher(user)
         except PermissionDeniedError as e:
             return False, str(e)
-        self._post_repo.delete_post(post_id, user.id)
+        deleted = self._post_repo.delete_post(post_id, user.id)
+        if deleted == 0:
+            post = self._post_repo.get_post_by_id(post_id)
+            if post is None:
+                return False, "Post not found."
+            return False, "You are not authorized to delete this post."
         return True, None
 
 
@@ -404,31 +409,49 @@ class VoiceService(BaseService):
         post = self._repo.create(user_id, self._sanitize(title), self._sanitize(content), category)
         return (post, None) if post else (None, "Failed to create post.")
 
-    def update_status(self, voice_post_id, status):
+    def update_status(self, voice_post_id, status, user=None):
         """
         Update a voice post's status.
 
         Typically called by a publisher to mark a grievance as 'resolved'
-        or 'closed' after addressing it.
+        or 'closed' after addressing it. Enforces publisher-only access
+        when a `user` is supplied (POLYMORPHISM: delegates to user.can_publish()).
 
         @param voice_post_id: Voice post's primary key
         @param status: New status — 'open', 'resolved', or 'closed'
+        @param user: Optional User performing the update — if provided, must be a publisher
         @return: (success: bool, error)
         """
+        if user is not None:
+            try:
+                self._check_publisher(user)
+            except PermissionDeniedError as e:
+                return False, str(e)
         if status not in self.VALID_STATUSES:
             return False, f"Invalid status. Must be one of: {', '.join(self.VALID_STATUSES)}"
-        self._repo.update_status(voice_post_id, status)
+        result = self._repo.update_status(voice_post_id, status)
+        if result is None:
+            return False, "Post not found."
         return True, None
 
     def delete_post(self, voice_post_id, user_id):
         """
         Delete a voice post. Only the original author can delete.
 
+        Returns an error if the post does not exist or the caller is not
+        the author (rows deleted == 0).
+
         @param voice_post_id: Voice post's primary key
         @param user_id: Author's user ID (for authorization)
         @return: (success: bool, error)
         """
-        self._repo.delete(voice_post_id, user_id)
+        deleted = self._repo.delete(voice_post_id, user_id)
+        if deleted == 0:
+            # Distinguish not-found vs not-owner for the route to map to 403
+            post = self._repo.get_by_id(voice_post_id)
+            if post is None:
+                return False, "Post not found."
+            return False, "You are not authorized to delete this post."
         return True, None
 
     # -- comments --------------------------------------------------------
@@ -622,6 +645,8 @@ class ProjectService(BaseService):
         """
         Delete a project. ONLY the publisher who created it can delete.
 
+        Returns an error if the project is not owned by the caller.
+
         @param user: Current user (must be publisher)
         @param project_id: Project's primary key
         @return: (success: bool, error)
@@ -630,7 +655,12 @@ class ProjectService(BaseService):
             self._check_publisher(user)
         except PermissionDeniedError as e:
             return False, str(e)
-        self._repo.delete(project_id, user.id)
+        deleted = self._repo.delete(project_id, user.id)
+        if deleted == 0:
+            project = self._repo.get_by_id(project_id)
+            if project is None:
+                return False, "Project not found."
+            return False, "You are not authorized to delete this project."
         return True, None
 
 

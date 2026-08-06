@@ -24,6 +24,7 @@ REFACTORED for testability:
 from flask import Flask
 from flask_login import LoginManager
 from config import Config, LOGIN_VIEW
+from file_upload import FileUploadHelper
 from repository import UserRepository, PostRepository, ProjectRepository, ServiceRepository, DocumentRepository, VoiceRepository, BarangayRepository
 from service import AuthService, PostService, VoiceService, ProjectService, DocumentService, BarangayService
 from models import create_user_from_db
@@ -57,16 +58,25 @@ def _build_services(app, config):
     voice_repo = VoiceRepository(db_path=config.db_name)
     barangay_repo = BarangayRepository(db_path=config.db_name)
 
-    # -- services (injectable repositories) -------------------------------
+    # -- file upload helper (injected so routes/services share the same instance)
+    upload_helper = FileUploadHelper(
+        upload_dir=config.upload_folder,
+        allowed_extensions=config.allowed_extensions,
+    )
+
+    # -- services (injectable repositories + shared upload helper) --------
     auth_service = AuthService(user_repo=user_repo)
     post_service = PostService(post_repo=post_repo)
     voice_service = VoiceService(voice_repo=voice_repo)
     project_service = ProjectService(project_repo=project_repo)
-    document_service = DocumentService(document_repo=document_repo, config=config)
+    document_service = DocumentService(
+        document_repo=document_repo, config=config, upload_helper=upload_helper
+    )
     barangay_service = BarangayService(barangay_repo=barangay_repo)
 
     # -- attach to app ----------------------------------------------------
     app.extensions['config'] = config
+    app.extensions['upload_helper'] = upload_helper
     app.extensions['user_repo'] = user_repo
     app.extensions['post_repo'] = post_repo
     app.extensions['project_repo'] = project_repo

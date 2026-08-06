@@ -11,13 +11,13 @@ REFACTORED for testability:
     - In tests, inject mock services into app.extensions before calling routes.
 """
 
+import re
 import sqlite3
 
 import requests
 from flask import render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, login_user, logout_user, current_user
 from exceptions import DatabaseError
-from file_upload import get_upload_helper
 
 
 def _get_services():
@@ -25,7 +25,8 @@ def _get_services():
     Convenience helper: fetch injected services and repositories from the
     Flask app. Returns a dict keyed by: auth, posts, post_repo, user_repo,
     project_repo, project_service, service_repo, document_repo,
-    document_service, voice, voice_repo, barangay_repo, barangay_service.
+    document_service, voice, voice_repo, barangay_repo, barangay_service,
+    upload_helper.
     """
     ext = current_app.extensions
     return {
@@ -42,7 +43,35 @@ def _get_services():
         'voice_repo': ext['voice_repo'],
         'barangay_repo': ext['barangay_repo'],
         'barangay_service': ext['barangay_service'],
+        'upload_helper': ext.get('upload_helper'),
     }
+
+
+def _slugify(name):
+    """
+    Normalize a barangay name into a URL slug.
+
+    DRY: previously duplicated inline as `name.lower().replace(...)` in
+    my_barangay_hub and as a nested helper in barangay_hub. Mirrors the
+    JS slugify() in barangay_map.html (lowercase, non-alphanumeric → '-').
+    """
+    slug = (name or '').strip().lower()
+    slug = re.sub(r'[^a-z0-9]+', '-', slug)
+    return slug.strip('-')
+
+
+def _get_upload_helper():
+    """
+    Return the injected FileUploadHelper from app.extensions, falling back
+    to the legacy module singleton for standalone scripts/tests that don't
+    go through create_app().
+    """
+    helper = current_app.extensions.get('upload_helper')
+    if helper is not None:
+        return helper
+    # Fallback for scripts/tests wiring their own extensions dict
+    from file_upload import get_upload_helper as _fallback
+    return _fallback()
 
 
 def _barangay_display_name(barangay):
@@ -150,8 +179,7 @@ def create_routes(app):
             first = svc['barangay_repo'].get_first()
             name = (first or {}).get('name') or 'Payatas'
 
-        slug = name.lower().replace(' ', '-')
-        return redirect(f'/barangay/view/{slug}')
+        return redirect(f'/barangay/view/{_slugify(name)}')
 
 
     @app.route('/barangay/view/<barangay_slug>')
@@ -165,9 +193,6 @@ def create_routes(app):
         against the barangays table instead of hardcoding any location.
         """
         svc = _get_services()
-
-        def _slugify(name):
-            return (name or '').lower().replace(' ', '-').replace(',', '')
 
         target = _slugify(barangay_slug)
 
@@ -351,12 +376,12 @@ def create_routes(app):
             content = data.get('content', '') if data else ''
             category = data.get('category', 'Announcement') if data else 'Announcement'
 
-        # Handle image upload using centralized FileUploadHelper (OOP Abstraction)
+        # Handle image upload via injected FileUploadHelper (OOP Abstraction + DI)
         image_path = ''
         uploaded_image = request.files.get('image') if request.files else None
         if uploaded_image and uploaded_image.filename:
             try:
-                image_path = get_upload_helper().save(uploaded_image, prefix='post')
+                image_path = _get_upload_helper().save(uploaded_image, prefix='post')
             except ValueError:
                 pass  # Invalid file type — silently skip image
 
@@ -683,11 +708,11 @@ def create_routes(app):
         phone_number = request.form.get('phone_number', '').strip()
         profile_picture_path = ''
 
-        # Handle profile picture upload using centralized FileUploadHelper
+        # Handle profile picture upload via injected FileUploadHelper
         uploaded_file = request.files.get('profile_picture')
         if uploaded_file and uploaded_file.filename:
             try:
-                profile_picture_path = get_upload_helper().save(
+                profile_picture_path = _get_upload_helper().save(
                     uploaded_file, prefix=f'profile_{current_user.id}'
                 )
             except ValueError:
@@ -866,13 +891,20 @@ def create_routes(app):
     @app.route('/api/voice/<int:post_id>/status', methods=['PUT'])
     @login_required
     def api_update_voice_status(post_id):
-        """API: Update a voice post's status (open/resolved/closed)."""
+        """
+        API: Update a voice post's status (open/resolved/closed).
+        Only barangay captains (publishers) may change status — citizens
+        get 403 (POLYMORPHISM via VoiceService.update_status).
+        """
         data = request.get_json()
         status = data.get('status', '') if data else ''
         svc = _get_services()
-        success, error = svc['voice'].update_status(post_id, status)
+        success, error = svc['voice'].update_status(post_id, status, user=current_user)
         if error:
-            return jsonify({'error': error}), 400
+            code = 403 if 'not authorized' in error.lower() else 400
+            if 'not found' in error.lower():
+                code = 404
+            return jsonify({'error': error}), code
         return jsonify({'success': True})
 
     @app.route('/api/voice/<int:post_id>', methods=['DELETE'])

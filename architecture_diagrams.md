@@ -54,13 +54,13 @@ classDiagram
         -_login_view: str
         -_openweather_api_key: str
         -_upload_folder: str
-        -_allowed_extensions: set
+        -_allowed_extensions: frozenset
         +db_name: str (r)
         +secret_key: str (r)
         +login_view: str (r)
         +openweather_api_key: str (r)
         +upload_folder: str (r)
-        +allowed_extensions: set (r)
+        +allowed_extensions: frozenset (r)
     }
 
     %% ────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ classDiagram
         <<abstract>>
         -_db_path: str
         +_get_db() Connection
-        +_execute(query, params, fetch, commit) any
+        +_execute(query, params, fetch, commit) any  %% via DBContext (with)
         +_execute_write(query, params) cursor
     }
     class UserRepository {
@@ -115,8 +115,8 @@ classDiagram
         +get_all_posts(...) list
         +get_post_by_id(id) Row
         +create_post(...) dict
-        +update_post(id, user_id, title, content) dict
-        +delete_post(id, user_id) None
+        +update_post(id, user_id, title, content) dict|None  %% None if not owner
+        +delete_post(id, user_id) int  %% rowcount
         +get_comments_for_post(id) list
         +add_comment(post_id, user_id, content) dict
         +get_reactions_for_post(id) list
@@ -129,8 +129,8 @@ classDiagram
         +get_by_id(id) Row
         +get_by_publisher(id) list
         +create(...) dict
-        +update(id, ...) dict
-        +delete(id, user_id) None
+        +update(id, ...) dict|None  %% None if not owner
+        +delete(id, user_id) int  %% rowcount
     }
     class ServiceRepository {
         +get_all() list
@@ -143,8 +143,8 @@ classDiagram
         +get_all(...) list
         +get_by_id(id) dict
         +create(user_id, title, content, category) dict
-        +delete(id, user_id) None
-        +update_status(id, status) None
+        +delete(id, user_id) int  %% rowcount
+        +update_status(id, status) dict|None
         +get_comments(id) list
         +add_comment(id, user_id, content, official) dict
         +toggle_vote(id, user_id, type) tuple
@@ -190,15 +190,15 @@ classDiagram
         +toggle_reaction(post_id, user_id, emoji) tuple
         +create_post(user, title, content, ...) tuple
         +update_post(user, post_id, title, content) tuple
-        +delete_post(user, post_id) tuple
+        +delete_post(user, post_id) tuple  %% rowcount → 403/404
     }
     class VoiceService {
         -_repo: VoiceRepository
         +get_posts(...) list
         +get_post_detail(id, user_id) dict
         +create_post(user_id, title, content, category) tuple
-        +update_status(id, status) tuple
-        +delete_post(id, user_id) tuple
+        +update_status(id, status, user?) tuple  %% publisher-only when user supplied
+        +delete_post(id, user_id) tuple  %% 403 if not owner / 404 if missing
         +add_comment(id, user_id, content, role) tuple
         +toggle_vote(id, user_id, type) tuple
         +get_categories() list
@@ -207,7 +207,7 @@ classDiagram
         -_repo: ProjectRepository
         +create_project(user, ...) tuple
         +update_project(user, id, ...) tuple
-        +delete_project(user, id) tuple
+        +delete_project(user, id) tuple  %% rowcount → 403/404
     }
     class DocumentService {
         -_repo: DocumentRepository
@@ -234,9 +234,14 @@ classDiagram
     %% ────────────────────────────────────────────────────
     class FileUploadHelper {
         -_upload_dir: str
-        -_allowed_extensions: set
+        -_allowed_extensions: frozenset
         +save(file, prefix, exts) str
         +delete(url_path) bool
+    }
+    class UploadHelperMixin {
+        <<injected via app.extensions>>
+        +_slugify(name) str
+        +_get_upload_helper() FileUploadHelper
     }
 
     %% ────────────────────────────────────────────────────

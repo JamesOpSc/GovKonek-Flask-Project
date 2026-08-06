@@ -109,13 +109,8 @@ def create_database():
     except sqlite3.OperationalError:
         pass
 
-    # -- Migration: nested comments (parent_id) --------------------------
-    # Enables threaded replies: a comment can reference another comment
-    # as its parent via parent_id.
-    try:
-        cursor.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id)")
-    except sqlite3.OperationalError:
-        pass
+    # NOTE: parent_id migration intentionally placed AFTER comments table
+    # (fresh DB creates column directly; migration handles legacy DBs).
 
 # ===================================================================
 # INTERACTION TABLES
@@ -123,18 +118,26 @@ def create_database():
 
     # -- Comments --------------------------------------------------------
     # Stores user comments on announcement posts.
-    # parent_id (added via migration) enables threaded/nested replies.
+    # parent_id enables threaded/nested replies (added for fresh DBs;
+    # migration below handles legacy DBs without it).
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS comments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             post_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
             content TEXT NOT NULL,
+            parent_id INTEGER REFERENCES comments(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+
+    # -- Migration: nested comments (parent_id) for legacy DBs -----------
+    try:
+        cursor.execute("ALTER TABLE comments ADD COLUMN parent_id INTEGER REFERENCES comments(id)")
+    except sqlite3.OperationalError:
+        pass  # column already exists or table was just created with it
 
     # -- Reactions -------------------------------------------------------
     # Each user can react to a post with exactly ONE emoji at a time.
