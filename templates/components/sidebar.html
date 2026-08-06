@@ -78,26 +78,36 @@
     </div>
 
     <script>
-        // Highlight the active sidebar link based on the current URL
+        // Highlight the active sidebar link based on the current URL.
+        // Ordering matters: check longer prefixes first so /barangay/view/*
+        // and /barangay/landing don't both match "barangay".
         (function() {
             const path = window.location.pathname;
-            const links = document.querySelectorAll('.sidebar-link[data-page]');
-            links.forEach(link => {
-                link.classList.remove('active');
-                const page = link.getAttribute('data-page');
-                if (page === 'dashboard' && (path === '/dashboard' || path === '/')) {
-                    link.classList.add('active');
-                } else if (path.includes('/' + page.replace('_', '-'))) {
-                    link.classList.add('active');
-                } else if (path === '/' + page) {
-                    link.classList.add('active');
+            const pageTargets = [
+                { page: 'voice',        match: ['/citizens-voice', '/voice'] },
+                { page: 'documents',    match: ['/documents', '/api/documents'] },
+                { page: 'services',     match: ['/services'] },
+                { page: 'projects',     match: ['/projects'] },
+                { page: 'barangay_map', match: ['/barangay-map'] },
+                { page: 'barangay',     match: ['/barangay/'] }, // hub + landing + view
+                { page: 'dashboard',    match: ['/dashboard', '/'] },
+            ];
+            let matched = null;
+            for (const t of pageTargets) {
+                if (t.match.some(p => path === p || path.startsWith(p + '/') || (p === '/dashboard' && path === '/') || (p === '/' && path === '/'))) {
+                    matched = t.page;
+                    break;
                 }
-            });
-            // Fallback: if none matched, highlight dashboard
-            if (!document.querySelector('.sidebar-link.active')) {
-                const dash = document.querySelector('.sidebar-link[data-page="dashboard"]');
-                if (dash) dash.classList.add('active');
+                if (t.match.some(p => p !== '/' && path.includes(p))) {
+                    matched = t.page;
+                    break;
+                }
             }
+            // Fallback to dashboard if nothing matched
+            if (!matched) matched = 'dashboard';
+            document.querySelectorAll('.sidebar-link[data-page]').forEach(link => {
+                link.classList.toggle('active', link.getAttribute('data-page') === matched);
+            });
         })();
     </script>
 

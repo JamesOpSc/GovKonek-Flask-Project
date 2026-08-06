@@ -1,47 +1,36 @@
 <style>
-
-.tracker-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 15px; /* Added horizontal padding */
-        border-bottom: 1px solid #e2e8f0;
-        border-radius: 8px; /* Rounded corners for the hover effect */
-        transition: all 0.2s ease;
-        cursor: pointer;
-        border: 1px solid transparent; /* Invisible border to prevent jumping */
-    }
-    
-    .tracker-item:hover {
-        background-color: #f8fafc;
-        border-color: #e2e8f0;
-        transform: translateX(6px); /* Slides to the right! */
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-
-    /* Target the Quick Action buttons */
-    .btn {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .btn:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
-    }
-
     .tracker-list {
         list-style: none;
         margin-top: 15px;
+        padding: 0;
     }
     .tracker-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 0;
+        padding: 12px 15px;
+        border-radius: 8px;
+        border: 1px solid transparent;
         border-bottom: 1px solid #e2e8f0;
+        transition: all 0.2s ease;
+        cursor: pointer;
+    }
+    .tracker-item:hover {
+        background-color: #f8fafc;
+        border-color: #e2e8f0;
+        transform: translateX(6px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     .tracker-item:last-child {
         border-bottom: none;
+    }
+    /* Card-local button hover — scoped to Quick Actions */
+    .card .btn {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .card .btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
     }
     .req-badge {
         padding: 4px 10px;

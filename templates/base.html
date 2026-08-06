@@ -52,11 +52,29 @@
     
     {% include 'components/sidebar.html' %}
 
-    <main class="workspace" style="margin-left: 220px; padding: 40px; width: 100%;">
-        
+    <main class="workspace" style="margin-left: 220px; padding: 40px; width: 100%; max-width: 1400px; box-sizing: border-box;">
+        {# Flash messages (rendered on every page that extends base.html).
+           Login/register have their own inline flash block, so we suppress
+           duplicates there via endpoint check. #}
+        {% set ep = request.endpoint %}
+        {% if ep not in ['login', 'register'] %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div style="margin-bottom:20px; display:flex; flex-direction:column; gap:10px;">
+              {% for category, message in messages %}
+              <div class="flash-msg flash-{{ category }}" role="alert" style="padding:14px 18px; border-radius:10px; font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; {% if category == 'error' %}background:#fef2f2; color:#991b1b; border:1px solid #fecaca; border-left:4px solid #ef4444;{% else %}background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; border-left:4px solid #22c55e;{% endif %}">
+                <span>{{ message }}</span>
+                <button onclick="this.parentElement.remove()" style="margin-left:auto; background:none; border:none; font-size:18px; cursor:pointer; color:inherit; opacity:0.6;">&times;</button>
+              </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        {% endif %}
+
         {% block content %}
         {% endblock %}
-        
+
     </main>
 
 </body>

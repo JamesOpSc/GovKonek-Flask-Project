@@ -239,6 +239,24 @@ class UserRepository(BaseRepository):
         )
         return self.find_by_id(user_id)
 
+    def update_barangay(self, user_id, barangay):
+        """Update the barangay a user is registered to (profile change).
+
+        The same normalized dedup that is used on /register applies here — any
+        canonical name accepted on register (e.g. 'Barangay San Jose' or
+        'Payatas') is valid. Resolution to a `barangays` row is via
+        `barangay_hub`/`my_barangay_hub` name matching, not by ID.
+
+        @param user_id: User's primary key
+        @param barangay: Canonical barangay name (value from the dropdown)
+        @return: Updated user row or None
+        """
+        self._execute_write(
+            'UPDATE users SET barangay = ? WHERE id = ?',
+            (barangay or '', user_id)
+        )
+        return self.find_by_id(user_id)
+
 
 # ===========================================================================
 # PostRepository
@@ -1012,6 +1030,30 @@ class BarangayRepository(BaseRepository):
             'SELECT * FROM barangays ORDER BY id ASC LIMIT 1', fetch='one'
         )
         return dict(row) if row else None
+
+    def get_by_name(self, name):
+        """
+        Find a barangay by name (case-insensitive, with/without 'Barangay ' prefix).
+
+        Used to resolve the barangay a user selected at registration
+        (users.barangay = 'Payatas') to the matching barangays row
+        ('Payatas' or 'Barangay Payatas') without relying on slugs.
+
+        @param name: Barangay name as stored on the user (e.g. 'Payatas')
+        @return: Barangay dict or None
+        """
+        if not name or not str(name).strip():
+            return None
+        target = str(name).strip().lower()
+        # strip optional "barangay " prefix for comparison
+        target_norm = target[9:] if target.startswith('barangay ') else target
+        for row in self.get_all():
+            row_name = (row.get('name') or '').strip()
+            lower = row_name.lower()
+            norm = lower[9:] if lower.startswith('barangay ') else lower
+            if lower == target or norm == target_norm:
+                return row
+        return None
 
     def create(self, name, description='', address='', phone='', email='',
                facebook='', office_hours_weekday='8:00 AM – 5:00 PM',

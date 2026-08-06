@@ -312,33 +312,22 @@
 <!-- HERO BANNER                                -->
 <!-- ═══════════════════════════════════════════ -->
 
-<div class="container mt-4">
-    <div class="jumbotron bg-light border p-5 rounded">
-        <h1 class="display-4 font-weight-bold">Barangay {{ barangay_name }}</h1>
-        <p class="lead text-muted">Official Local Government Unit Portal</p>
-        <hr class="my-4">
-        
-        <p class="font-size-lg">
-            {{ details.description if details else "Welcome to your local neighborhood command and communications center." }}
-        </p>
-        
-        {% if details %}
-            <span class="badge bg-info text-dark p-2">Estimated Population: {{ details.population }} Residents</span>
-        {% endif %}
-    </div>
-</div>
-
 <div class="landing-hero">
     <div class="landing-hero-content">
         <div class="hero-icon">🏛️</div>
         <div class="hero-text">
             <h1>Barangay {{ barangay_name if barangay_name else 'Portal' }}</h1>
-            <p style="font-style:italic; opacity:0.75; margin-top:8px; font-size:14px;">
-                ✦ Serbisyong Tapat, Para sa Lahat!
+            {% if barangay and barangay.description %}
+            <p style="opacity:0.85; line-height:1.6; margin-top:8px; max-width:640px;">{{ barangay.description }}</p>
+            {% else %}
+            <p style="opacity:0.75; line-height:1.6; margin-top:8px;">Official Local Government Unit Portal</p>
+            {% endif %}
+            <p style="font-style:italic; opacity:0.65; margin-top:6px; font-size:13px;">
+                ✦ {{ barangay.motto if barangay and barangay.motto else 'Serbisyong Tapat, Para sa Lahat!' }}
             </p>
         </div>
-        <div class="hero-actions">
-            <a href="{{ url_for('e_services') }}" class="hero-btn hero-btn-primary">
+            <div class="hero-actions">
+                <a href="{{ url_for('e_services') }}" class="hero-btn hero-btn-primary">
                     📄 Browse E-Services
                 </a>
                 <a href="{{ url_for('barangay_map') }}" class="hero-btn hero-btn-outline">
@@ -356,15 +345,15 @@
             </div>
         </div>
     </div>
-</div>
 
 <!-- ═══════════════════════════════════════════ -->
 <!-- ANNOUNCEMENT                               -->
 <!-- ═══════════════════════════════════════════ -->
+{% set _bname = (('Barangay ' ~ barangay.name) if (barangay and barangay.name and not barangay.name.lower().startswith('barangay ')) else (barangay.name if barangay and barangay.name else 'Barangay Hall')) %}
 <div class="announcement-banner">
     <span class="announce-icon">📢</span>
     <span class="announce-text">
-        <strong>Office Advisory:</strong> The {{ barangay.name if barangay else 'Barangay Hall' }} is open Monday to Friday, {{ barangay.office_hours_weekday if barangay else '8:00 AM – 5:00 PM' }}.
+        <strong>Office Advisory:</strong> The {{ _bname }} office is open Monday to Friday, {{ barangay.office_hours_weekday if barangay else '8:00 AM – 5:00 PM' }}.
         For urgent concerns outside office hours, please contact the Barangay Public Safety Office.
     </span>
 </div>

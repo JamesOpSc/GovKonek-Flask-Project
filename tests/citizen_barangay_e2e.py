@@ -142,15 +142,20 @@ client2 = app.test_client()  # for second user parallel
 client3 = app.test_client()  # for third user
 
 results = []
+def _safe(s):
+    """Return an ASCII-safe version of s for cp1252 consoles."""
+    try:
+        s.encode('cp1252')
+        return s
+    except UnicodeEncodeError:
+        return s.encode('ascii', 'replace').decode('ascii')
+
 def check(name, condition, detail=""):
     ok = bool(condition)
     results.append((name, ok, detail))
     icon = "[PASS]" if ok else "[FAIL]"
     extra = f" -- {detail}" if detail and not ok else (f" ({detail})" if detail and ok else "")
-    try:
-        print(f" {icon} {name}{extra}")
-    except UnicodeEncodeError:
-        print(f" {icon} {name}")
+    print(f" {icon} {_safe(name)}{_safe(extra)}")
     return ok
 
 def section(title):
@@ -793,7 +798,7 @@ notes = [
  "• Remaining: /barangay/view/<slug> unknown slug silently falls back to first barangay — could be 404+flash.",
 ]
 for n in notes:
-    print(n)
+    print(_safe(n))
 
 # Cleanup
 import shutil

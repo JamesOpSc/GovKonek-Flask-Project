@@ -250,7 +250,6 @@
                     <div class="comment-content">
                         <div class="comment-author">
                             {{ comment.username }}
-                            {% if role == 'publisher' %}<span class="official">🏛️ Official</span>{% endif %}
                         </div>
                         <div class="comment-text">{{ comment.content }}</div>
                         <div class="comment-time">{{ comment.created_at }}</div>

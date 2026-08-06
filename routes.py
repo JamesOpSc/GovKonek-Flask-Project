@@ -83,6 +83,61 @@ def _barangay_display_name(barangay):
     return name[9:] if name.lower().startswith('barangay ') else name
 
 
+def _barangay_options():
+    """
+    Build the de-duplicated barangay dropdown options (used on both
+    /register and /profile).
+
+    Normalized key = lowercased name without leading 'barangay ' and
+    without trailing ', ...' — so 'Bagong Silangan' and
+    'Barangay Bagong Silangan' collapse to one entry.
+    """
+    CURATED = ['Payatas', 'Bagong Silangan', 'Batasan Hills', 'Barangay San Jose', 'Barangay 76, Pasay City']
+    options = []
+    seen = set()
+
+    def _norm(name):
+        n = (name or '').strip().lower()
+        if n.startswith('barangay '):
+            n = n[9:]
+        return n.split(',')[0].strip()
+
+    for name in CURATED:
+        key = _norm(name)
+        if key and key not in seen:
+            seen.add(key)
+            label = name if name.lower().startswith('barangay ') else f'Barangay {name}'
+            options.append({'value': name, 'label': label})
+
+    try:
+        for b in _get_services()['barangay_repo'].get_all():
+            bname = (b.get('name') or '').strip()
+            if not bname or bname == 'Barangay Hall':
+                continue
+            key = _norm(bname)
+            if key and key not in seen:
+                seen.add(key)
+                label = bname if bname.lower().startswith('barangay ') else f'Barangay {bname}'
+                options.append({'value': bname, 'label': label})
+    except (DatabaseError, sqlite3.Error):
+        pass
+    return options
+
+
+def _profile_template_vars(user_id):
+    """
+    Gather the variables needed to render profile.html:
+    - the user's row (so the template can show current barangay)
+    - the de-duplicated barangay_options list
+    """
+    user_repo = _get_services()['user_repo']
+    return {
+        'user_id': user_id,
+        'user_data': user_repo.find_by_id(user_id),
+        'barangay_options': _barangay_options(),
+    }
+
+
 def _project_payload(data):
     """
     Extract the shared project fields from a JSON payload.
@@ -126,15 +181,7 @@ def create_routes(app):
         instead of falling back to a hardcoded default.
         """
         svc = _get_services()
-        # Dynamic barangay dropdown — real barangays from the DB when available.
-        # Gracefully degrade if the barangays table is missing (e.g. minimal DBs).
-        barangays = []
-        try:
-            all_barangays = svc['barangay_repo'].get_all()
-            barangays = [b for b in all_barangays if b.get('publisher_id') is not None]
-        except (DatabaseError, sqlite3.Error):
-            # Gracefully degrade if the barangays table is missing (e.g. minimal DBs)
-            barangays = []
+        barangay_options = _barangay_options()
 
         if request.method == 'POST':
             # Extract form fields
@@ -152,7 +199,7 @@ def create_routes(app):
             else:
                 flash(message, 'error')
 
-        return render_template('register.html', barangays=barangays)
+        return render_template('register.html', barangay_options=barangay_options, barangays=barangay_options)
     
     @app.route('/barangay/my-hub')
     @login_required
@@ -162,23 +209,35 @@ def create_routes(app):
         its landing page (/barangay/view/<slug>).
 
         Resolution order:
-          1. Publisher → their own barangay record (barangays.publisher_id)
-          2. The barangay chosen at registration (users.barangay)
+          1. Publisher with an owned barangay → that record
+          2. Barangay chosen at registration (users.barangay) → matching row
           3. Fallback: the first barangay in the database
+
+        Citizens (and publishers without an owned page) now see the
+        barangay they selected at sign-up, not the generic 'Barangay Hall'.
         """
         svc = _get_services()
+        repo = svc['barangay_repo']
 
-        barangay = None
+        # 1. Publisher's owned barangay
         if current_user.role == 'publisher':
-            barangay = svc['barangay_repo'].get_by_publisher(current_user.id)
+            owned = repo.get_by_publisher(current_user.id)
+            if owned:
+                return redirect(f'/barangay/view/{_slugify(owned["name"])}')
 
-        name = (barangay or {}).get('name') if barangay else ''
-        if not name:
-            name = getattr(current_user, 'barangay', '') or ''
-        if not name:
-            first = svc['barangay_repo'].get_first()
-            name = (first or {}).get('name') or 'Payatas'
+        # 2. Registration choice (e.g. 'Payatas' → 'Payatas' row, not 'Barangay Hall')
+        chosen = (getattr(current_user, 'barangay', '') or '').strip()
+        if chosen:
+            match = repo.get_by_name(chosen)
+            if match:
+                return redirect(f'/barangay/view/{_slugify(match["name"])}')
+            # No matching row yet (e.g. new barangay name) — still slug-redirect
+            # so barangay_hub can render the generic page rather than the hall
+            return redirect(f'/barangay/view/{_slugify(chosen)}')
 
+        # 3. Last resort
+        first = repo.get_first()
+        name = (first or {}).get('name') or 'Payatas'
         return redirect(f'/barangay/view/{_slugify(name)}')
 
 
@@ -203,7 +262,12 @@ def create_routes(app):
                 barangay = b
                 break
         if not barangay:
-            barangay = svc['barangay_repo'].get_first()
+            # Citizen's registered barangay (e.g. 'Payatas') may exist as
+            # 'Payatas' row with no publisher — try name lookup before
+            # falling back to the generic 'Barangay Hall'.
+            barangay = svc['barangay_repo'].get_by_name(barangay_slug.replace('-', ' '))
+            if not barangay:
+                barangay = svc['barangay_repo'].get_first()
 
         # Announcements published by this barangay's captain
         announcements = []
@@ -213,6 +277,13 @@ def create_routes(app):
 
         projects = svc['project_repo'].get_all()
 
+        # Only the owning publisher can edit
+        is_owner = bool(
+            barangay
+            and current_user.role == 'publisher'
+            and barangay.get('publisher_id') == current_user.id
+        )
+
         return render_template(
             'barangay_landing.html',
             barangay_name=_barangay_display_name(barangay),
@@ -220,7 +291,7 @@ def create_routes(app):
             details=barangay,
             announcements=announcements,
             projects=projects,
-            is_owner=False,
+            is_owner=is_owner,
             name=current_user.username,
             role=current_user.role,
         )
@@ -283,10 +354,14 @@ def create_routes(app):
     @app.route('/profile')
     @login_required
     def profile():
-        """User profile page."""
+        """User profile page — includes barangay selector so users can change it."""
+        vars = _profile_template_vars(current_user.id)
         return render_template('profile.html',
                                name=current_user.username,
-                               role=current_user.role)
+                               role=current_user.role,
+                               barangay=current_user.barangay or '',
+                               barangay_options=vars['barangay_options'],
+                               current_barangay=vars['user_data']['barangay'] if vars['user_data'] and 'barangay' in vars['user_data'].keys() else '')
 
     @app.route('/logout')
     @login_required
@@ -686,8 +761,8 @@ def create_routes(app):
         """
         API: Get or update the current user's profile.
 
-        GET  → returns { profile: { email, address, phone_number, profile_picture } }
-        POST → updates profile with multipart/form-data (supports profile_picture upload)
+        GET  → returns { profile: { email, address, phone_number, profile_picture, barangay } }
+        POST → updates profile with multipart/form-data (supports profile_picture + barangay)
         """
         user_repo = _get_services()['user_repo']
 
@@ -700,23 +775,42 @@ def create_routes(app):
                 'address': user_data['address'] or '',
                 'phone_number': user_data['phone_number'] or '',
                 'profile_picture': user_data['profile_picture'] or '',
+                'barangay': user_data['barangay'] if 'barangay' in user_data.keys() else '',
             }})
 
         # POST — update profile
         email = request.form.get('email', '').strip()
         address = request.form.get('address', '').strip()
         phone_number = request.form.get('phone_number', '').strip()
+        barangay_val = request.form.get('barangay', None)
         profile_picture_path = ''
+
+        # Handle barangay change — only if a value was submitted (don't clear on old clients)
+        if barangay_val is not None:
+            barangay_val = barangay_val.strip()
+            if barangay_val:
+                user_repo.update_barangay(current_user.id, barangay_val)
+            # empty string means "no change" — don't wipe the field with ''
+            # (the dropdown is required, so this only matters for manual POSTs)
+            elif request.form.get('barangay') == '':
+                pass  # treat empty submission as no-change
 
         # Handle profile picture upload via injected FileUploadHelper
         uploaded_file = request.files.get('profile_picture')
+        # preserve existing picture if no new file
+        existing_pic = ''
+        if not (uploaded_file and uploaded_file.filename):
+            data = user_repo.find_by_id(current_user.id)
+            existing_pic = (data['profile_picture'] if data and 'profile_picture' in data.keys() else '') or ''
         if uploaded_file and uploaded_file.filename:
             try:
                 profile_picture_path = _get_upload_helper().save(
                     uploaded_file, prefix=f'profile_{current_user.id}'
                 )
             except ValueError:
-                profile_picture_path = ''  # Invalid file type — skip
+                profile_picture_path = existing_pic  # invalid type — keep existing
+        else:
+            profile_picture_path = existing_pic
 
         user_repo.update_profile(
             current_user.id,
@@ -725,7 +819,9 @@ def create_routes(app):
             phone_number=phone_number,
             profile_picture=profile_picture_path
         )
-        return jsonify({'success': True, 'message': 'Profile updated!'})
+        updated = user_repo.find_by_id(current_user.id)
+        barangay_after = (updated['barangay'] if updated and 'barangay' in updated.keys() else '') or ''
+        return jsonify({'success': True, 'message': 'Profile updated!', 'barangay': barangay_after})
 
     @app.route('/api/documents', methods=['POST'])
     @login_required

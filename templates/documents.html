@@ -61,7 +61,6 @@
         align-items: center;
         gap: 16px;
         transition: all 0.2s;
-        cursor: pointer;
     }
     .doc-card:hover {
         border-color: #bae6fd;
@@ -269,12 +268,13 @@
     }
 
     function renderDoc(d) {
-        const deleteBtn = {{ 'true' if role == 'publisher' else 'false' }}
-            ? `<button class="doc-delete" onclick="deleteDocument(${d.id}, '${escapeHtml(d.title).replace(/'/g, "\\'")}')">🗑 Delete</button>`
+        const canDelete = {{ 'true' if role == 'publisher' else 'false' }};
+        const deleteBtn = canDelete
+            ? `<button class="doc-delete" data-doc-id="${d.id}" data-doc-title="${escapeHtml(d.title)}">🗑 Delete</button>`
             : '';
         const downloadBtn = d.file_url && d.file_url !== '#'
             ? `<a href="${escapeHtml(d.file_url)}" download class="doc-download" style="text-decoration:none;">⬇ Download</a>`
-            : `<button class="doc-download" onclick="alert('📥 No file attached yet.')">⬇ Download</button>`;
+            : `<button class="doc-download" type="button" style="opacity:0.6;cursor:default;" title="No file attached">⬇ No file</button>`;
         return `
         <div class="doc-card" data-category="${escapeHtml(d.category)}" data-title="${escapeHtml(d.title).toLowerCase()}" data-desc="${escapeHtml(d.description).toLowerCase()}" data-date="${d.published_date || ''}">
             <div class="doc-icon">${getDocIcon(d.category)}</div>
@@ -463,6 +463,13 @@ async function deleteDocument(docId, docTitle) {
         alert('❌ Network error. Please try again.');
     }
 }
+
+// Event delegation for Delete (data-* attrs, quote-safe)
+document.getElementById('docList').addEventListener('click', function(e) {
+    const btn = e.target.closest('.doc-delete');
+    if (!btn) return;
+    deleteDocument(parseInt(btn.dataset.docId, 10), btn.dataset.docTitle);
+});
 
 // Close modal on overlay click
 document.getElementById('uploadModal').addEventListener('click', function(e) {

@@ -200,19 +200,17 @@
                 </select>
             </div>
 
-            <!-- BARANGAY SELECTION DROPDOWN (selection is saved on the account
-                 and used to resolve /barangay/view/<slug> dynamically) -->
+            <!-- BARANGAY SELECTION — de-duplicated by normalized name
+                 (with/without 'Barangay ' prefix) so e.g. 'Payatas' and
+                 'Barangay Payatas' don't both appear. Value is the canonical
+                 name as stored in users.barangay (resolved via
+                 BarangayRepository.get_by_name). -->
             <div class="form-group">
                 <label for="barangay">Your Barangay (Quezon City)</label>
                 <select id="barangay" name="barangay" class="form-input" required>
                     <option value="" disabled selected>Select your barangay</option>
-                    <option value="Payatas">Payatas</option>
-                    <option value="Bagong Silangan">Bagong Silangan</option>
-                    <option value="Batasan Hills">Batasan Hills</option>
-                    {% for b in barangays %}
-                        {% if b.name not in ['Payatas', 'Bagong Silangan', 'Batasan Hills'] %}
-                        <option value="{{ b.name }}">{{ b.name }}</option>
-                        {% endif %}
+                    {% for opt in barangay_options %}
+                    <option value="{{ opt.value }}">{{ opt.label }}</option>
                     {% endfor %}
                 </select>
             </div>

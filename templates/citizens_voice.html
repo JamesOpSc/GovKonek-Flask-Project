@@ -528,7 +528,7 @@
                 <button class="vote-btn ${userVote==='down'?'voted-down':''}" onclick="vote(${p.id},'down')">
                     👎
                 </button>
-                ${(p.user_id == GOVKONEK_USER_ID || GOVKONEK_ROLE === 'publisher') ? `
+                ${p.user_id == GOVKONEK_USER_ID ? `
                     <button class="btn-outline" style="margin-left:auto;color:#ef4444;border-color:#fecaca;" onclick="deleteVoicePost(${p.id})">🗑️ Delete</button>
                 ` : ''}
             </div>
