@@ -58,6 +58,17 @@
     }
     .btn-logout:hover {
         background: #fef2f2;
+    @media (max-width: 768px) {
+        .sidebar {
+            width: 100%;
+            height: auto;
+            position: relative;
+            border-right: none;
+            border-bottom: 1px solid #e2e8f0;
+            padding: 20px 16px;
+        }
+        .brand { margin-bottom: 20px; }
+        .btn-logout { margin-top: 15px; }
     }
 </style>
 
@@ -89,7 +100,7 @@
                 { page: 'services',     match: ['/services'] },
                 { page: 'projects',     match: ['/projects'] },
                 { page: 'barangay_map', match: ['/barangay-map'] },
-                { page: 'barangay',     match: ['/barangay/'] }, // hub + landing + view
+                { page: 'barangay',     match: ['/barangay/', '/barangay-landing', '/barangay'] }, // hub + landing + view
                 { page: 'dashboard',    match: ['/dashboard', '/'] },
             ];
             let matched = null;

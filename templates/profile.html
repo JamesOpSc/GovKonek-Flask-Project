@@ -20,11 +20,18 @@
         <form id="profileForm" style="display: flex; flex-direction: column; gap: 16px;">
             <div>
                 <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">My Barangay</label>
+                {% if barangay_options %}
                 <select id="profileBarangay" name="barangay" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#0f172a;background:#fff;cursor:pointer;">
                     {% for opt in barangay_options %}
                     <option value="{{ opt.value }}" {% if opt.value == (current_barangay or barangay or '') %}selected{% endif %}>{{ opt.label }}</option>
                     {% endfor %}
                 </select>
+                {% else %}
+                <select id="profileBarangay" name="barangay" disabled style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#94a3b8;background:#f8fafc;cursor:not-allowed;">
+                    <option value="" selected>No barangays available yet</option>
+                </select>
+                <div style="font-size:11px;color:#f59e0b;margin-top:4px;">No barangays have been created by a Barangay Official yet.</div>
+                {% endif %}
                 <div style="font-size:11px;color:#94a3b8;margin-top:4px;">Controls what <a href="{{ url_for('my_barangay_hub') }}" style="color:#0ea5e9;text-decoration:underline;">My Barangay Hub</a> shows. Change anytime.</div>
             </div>
             <div>

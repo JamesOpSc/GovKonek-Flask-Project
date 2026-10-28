@@ -400,14 +400,16 @@
         <div id="announcementsList">
             {% if announcements %}
                 {% for a in announcements %}
-                <div class="service-list-item announcement-item" data-id="{{ a.id }}">
-                    <div class="service-list-icon" style="background:#eff6ff;">📢</div>
-                    <div class="service-list-info">
-                        <h4>{{ a.title }}</h4>
-                        <p>{{ a.content[:120] }}{% if a.content|length > 120 %}...{% endif %}</p>
-                        <small style="color:#94a3b8;font-size:11px;">{{ a.created_at }} · {{ a.publisher_name }}</small>
+                <a href="{{ url_for('post_detail', post_id=a.id) }}" style="text-decoration:none;color:inherit;display:block;">
+                    <div class="service-list-item announcement-item" data-id="{{ a.id }}" style="cursor:pointer;">
+                        <div class="service-list-icon" style="background:#eff6ff;">📢</div>
+                        <div class="service-list-info" style="word-break:break-word;overflow-wrap:break-word;">
+                            <h4>{{ a.title }}</h4>
+                            <p>{{ a.content[:120] }}{% if a.content|length > 120 %}...{% endif %}</p>
+                            <small style="color:#94a3b8;font-size:11px;">{{ a.created_at }} · {{ a.publisher_name }}</small>
+                        </div>
                     </div>
-                </div>
+                </a>
                 {% endfor %}
             {% else %}
                 <div class="empty-state" style="padding:24px;text-align:center;color:#94a3b8;font-size:14px;">

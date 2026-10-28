@@ -109,14 +109,21 @@
 
         /* Flash Message Alerts */
         .alert {
-            background-color: #fee2e2;
-            color: #991b1b;
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 25px;
             font-size: 14px;
-            border-left: 4px solid #ef4444;
             text-align: left;
+        }
+        .alert-error {
+            background-color: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+        .alert-success {
+            background-color: #f0fdf4;
+            color: #166534;
+            border-left: 4px solid #22c55e;
         }
         .alert ul { margin: 0; padding-left: 20px; }
 
@@ -168,15 +175,13 @@
         </div>
         <div class="sub-tagline">Bringing Local Government and Citizens Closer</div>
 
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            <div class="alert">
-                <ul>
-                {% for message in messages %}
-                    <li>{{ message }}</li>
-                {% endfor %}
-                </ul>
+            {% for category, message in messages %}
+            <div class="alert {% if category == 'success' %}alert-success{% else %}alert-error{% endif %}">
+                {{ message }}
             </div>
+            {% endfor %}
           {% endif %}
         {% endwith %}
 
@@ -200,19 +205,24 @@
                 </select>
             </div>
 
-            <!-- BARANGAY SELECTION — de-duplicated by normalized name
-                 (with/without 'Barangay ' prefix) so e.g. 'Payatas' and
-                 'Barangay Payatas' don't both appear. Value is the canonical
-                 name as stored in users.barangay (resolved via
-                 BarangayRepository.get_by_name). -->
+            <!-- BARANGAY SELECTION — fully dynamic: only barangays actually
+                 created by a Barangay Captain (barangays.publisher_id IS NOT NULL)
+                 are listed. Fresh DB → empty until first captain creates one. -->
             <div class="form-group">
                 <label for="barangay">Your Barangay (Quezon City)</label>
+                {% if barangay_options %}
                 <select id="barangay" name="barangay" class="form-input" required>
                     <option value="" disabled selected>Select your barangay</option>
                     {% for opt in barangay_options %}
                     <option value="{{ opt.value }}">{{ opt.label }}</option>
                     {% endfor %}
                 </select>
+                {% else %}
+                <select id="barangay" name="barangay" class="form-input" disabled>
+                    <option value="" selected>No barangays available yet</option>
+                </select>
+                <small style="color:#94a3b8;font-size:12px;margin-top:6px;display:block;">A Barangay Official must create a barangay first. You can still register — you can set your barangay later in your profile.</small>
+                {% endif %}
             </div>
 
             <button type="submit" class="btn-submit">Create Account</button>

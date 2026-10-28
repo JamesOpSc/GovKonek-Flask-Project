@@ -46,13 +46,32 @@
             transition: 0.2s;
         }
         .btn:hover { background-color: #004085; }
+
+        /* Workspace container */
+        .workspace {
+            margin-left: 220px;
+            padding: 40px;
+            width: 100%;
+            max-width: 1400px;
+            box-sizing: border-box;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+            .workspace {
+                margin-left: 0 !important;
+                padding: 20px 16px !important;
+            }
+        }
     </style>
 </head>
 <body>
     
     {% include 'components/sidebar.html' %}
 
-    <main class="workspace" style="margin-left: 220px; padding: 40px; width: 100%; max-width: 1400px; box-sizing: border-box;">
+    <main class="workspace">
         {# Flash messages (rendered on every page that extends base.html).
            Login/register have their own inline flash block, so we suppress
            duplicates there via endpoint check. #}

@@ -377,6 +377,20 @@
         }
     });
 
+    // Preview attached image info
+    const postImageInput = document.getElementById('postImage');
+    if (postImageInput) {
+        postImageInput.addEventListener('change', function() {
+            const file = this.files[0];
+            const preview = document.getElementById('imagePreview');
+            if (file && preview) {
+                preview.textContent = `Selected: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+            } else if (preview) {
+                preview.textContent = '';
+            }
+        });
+    }
+
     // Initial load
     loadLedger();
 })();

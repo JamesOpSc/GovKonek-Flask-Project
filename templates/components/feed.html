@@ -305,6 +305,9 @@
         const category = post.category || 'Announcement';
         const catClass = 'cat-' + category;
         const detailUrl = `/post/${post.id}`;
+        const publisherHtml = post.publisher_id
+            ? `<a href="/barangay/${post.publisher_id}" class="publisher-link" onclick="event.stopPropagation()"><strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></a>`
+            : `<strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong>`;
         return `
         <div class="post-card" data-post-id="${post.id}" onclick="goToPost(event, ${post.id})">
             <div class="post-header" onclick="expandPost(event, ${post.id})">
@@ -313,9 +316,9 @@
                     <span class="post-category-badge ${catClass}">${escapeHtml(category)}</span>
                     <span class="post-date">${dateStr}</span>
                 </div>
-                <h4 class="post-title">${escapeHtml(post.title)}</h4>
-                <p class="post-snippet">${escapeHtml(snippet)}</p>
-                <div class="post-publisher">Posted by <a href="/barangay/${post.publisher_id}" class="publisher-link" onclick="event.stopPropagation()"><strong>${escapeHtml(post.publisher_name || 'Barangay')}</strong></a></div>
+                <h4 class="post-title" style="word-break:break-word;overflow-wrap:break-word;">${escapeHtml(post.title)}</h4>
+                <p class="post-snippet" style="word-break:break-word;overflow-wrap:break-word;">${escapeHtml(snippet)}</p>
+                <div class="post-publisher">Posted by ${publisherHtml}</div>
             </div>
             <div class="expand-hint" onclick="expandPost(event, ${post.id})">
                 Click to preview ▼ &nbsp;|&nbsp; <a href="${detailUrl}" style="color:#0056b3;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">Read full post →</a>
@@ -374,6 +377,9 @@
     function renderPostDetail(data) {
         const { post, comments, reaction_counts, user_reaction } = data;
         const fullContent = escapeHtml(post.content || '');
+        const imageHtml = post.image_path
+            ? `<div style="margin:12px 0 16px;"><img src="${escapeHtml(post.image_path)}" alt="Post image" style="max-width:100%;max-height:420px;border-radius:10px;object-fit:cover;"></div>`
+            : '';
 
         let reactionHtml = ALLOWED_EMOJI.map(emoji => {
             const countObj = reaction_counts.find(r => r.emoji === emoji);
@@ -393,7 +399,7 @@
                     <div class="comment-avatar">${(c.username || 'U')[0].toUpperCase()}</div>
                     <div class="comment-body">
                         <div class="comment-author">${escapeHtml(c.username || 'User')}</div>
-                        <div class="comment-text">${escapeHtml(c.content)}</div>
+                        <div class="comment-text" style="word-break:break-word;overflow-wrap:break-word;">${escapeHtml(c.content)}</div>
                         <div class="comment-time">${timeAgo(c.created_at)}</div>
                     </div>
                 </div>
@@ -404,7 +410,8 @@
 
         return `
             <div class="post-body" style="padding-top:0;">
-                <p style="font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;">${fullContent}</p>
+                <p style="font-size:14px;color:#334155;line-height:1.7;white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;">${fullContent}</p>
+                ${imageHtml}
             </div>
             <div class="reaction-bar" id="reactionBar-${post.id}">
                 ${reactionHtml}
@@ -513,7 +520,7 @@
         if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
-        return div.innerHTML;
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function parseSqliteDate(dateStr) {

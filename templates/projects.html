@@ -378,8 +378,8 @@
         const isOwner = currentRole === 'publisher' && p.publisher_id == currentUserId;
         const actionsHtml = isOwner ? `
             <div class="project-actions">
-                <button class="btn-icon edit" title="Edit" onclick="event.stopPropagation();openProjectModal(${p.id})">✏️</button>
-                <button class="btn-icon delete" title="Delete" onclick="event.stopPropagation();deleteProject(${p.id}, '${escapeHtml(p.title)}')">🗑️</button>
+                <button class="btn-icon edit" title="Edit" data-project-id="${p.id}">✏️</button>
+                <button class="btn-icon delete" title="Delete" data-project-id="${p.id}" data-project-title="${escapeHtml(p.title)}">🗑️</button>
             </div>` : '';
 
         return `
@@ -410,7 +410,7 @@
     function escapeHtml(s) {
         const d = document.createElement('div');
         d.textContent = s || '';
-        return d.innerHTML;
+        return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function showToast(msg, type) {
@@ -575,6 +575,22 @@
             })
             .catch(() => showToast('Network error. Please try again.', 'error'));
     };
+
+    // ====== Event delegation for edit and delete buttons ======
+    document.getElementById('projectGrid').addEventListener('click', function(e) {
+        const delBtn = e.target.closest('.btn-icon.delete');
+        if (delBtn) {
+            e.stopPropagation();
+            deleteProject(parseInt(delBtn.dataset.projectId, 10), delBtn.dataset.projectTitle);
+            return;
+        }
+        const editBtn = e.target.closest('.btn-icon.edit');
+        if (editBtn) {
+            e.stopPropagation();
+            openProjectModal(parseInt(editBtn.dataset.projectId, 10));
+            return;
+        }
+    });
 })();
 </script>
 {% endblock %}

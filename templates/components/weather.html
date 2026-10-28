@@ -420,8 +420,8 @@
     // Render weather data into the widget
     // =========================================================================
     function renderWeather(data, cityLabel) {
-        const current = data.current;
-        const daily = data.daily;
+        const current = data.current || {};
+        const daily = data.daily || {};
         const info = getWeatherInfo(current.weather_code);
 
         // Update location label
@@ -429,10 +429,14 @@
 
         // Update current conditions
         document.getElementById('weatherIcon').textContent = info.emoji;
-        document.getElementById('weatherTemp').textContent = Math.round(current.temperature) + '°C';
+        const tempText = (current.temperature !== null && current.temperature !== undefined) ? Math.round(current.temperature) + '°C' : '--°C';
+        const humidText = (current.humidity !== null && current.humidity !== undefined) ? current.humidity + '%' : '--%';
+        const windText = (current.wind_speed !== null && current.wind_speed !== undefined) ? Math.round(current.wind_speed) + ' km/h' : '-- km/h';
+
+        document.getElementById('weatherTemp').textContent = tempText;
         document.getElementById('weatherDesc').textContent = info.desc;
-        document.getElementById('weatherHumidity').textContent = '💧 ' + current.humidity + '%';
-        document.getElementById('weatherWind').textContent = '💨 ' + Math.round(current.wind_speed) + ' km/h';
+        document.getElementById('weatherHumidity').textContent = '💧 ' + humidText;
+        document.getElementById('weatherWind').textContent = '💨 ' + windText;
 
         // Apply theme CSS class
         const widget = document.getElementById('weatherWidget');
@@ -440,15 +444,20 @@
 
         // Build forecast
         let forecastHtml = '';
-        const numDays = Math.min(daily.time.length, 5);
+        const dailyTimes = daily.time || [];
+        const numDays = Math.min(dailyTimes.length, 5);
         for (let i = 0; i < numDays; i++) {
-            const dayInfo = getWeatherInfo(daily.weather_code[i]);
+            const dayCode = (daily.weather_code && daily.weather_code[i]) || 0;
+            const dayInfo = getWeatherInfo(dayCode);
+            const maxTemp = (daily.temp_max && daily.temp_max[i] !== undefined) ? Math.round(daily.temp_max[i]) : '--';
+            const minTemp = (daily.temp_min && daily.temp_min[i] !== undefined) ? Math.round(daily.temp_min[i]) : '--';
+            const precip = (daily.precip_prob && daily.precip_prob[i] !== undefined) ? daily.precip_prob[i] : 0;
             forecastHtml += `
                 <div class="forecast-day">
-                    <div class="day-label">${getDayLabel(daily.time[i], i)}</div>
+                    <div class="day-label">${getDayLabel(dailyTimes[i], i)}</div>
                     <div class="day-icon">${dayInfo.emoji}</div>
-                    <div class="day-temp">${Math.round(daily.temp_max[i])}° <span style="color:#94a3b8;font-weight:400;">${Math.round(daily.temp_min[i])}°</span></div>
-                    <div class="day-precip">💧 ${daily.precip_prob[i]}%</div>
+                    <div class="day-temp">${maxTemp}° <span style="color:#94a3b8;font-weight:400;">${minTemp}°</span></div>
+                    <div class="day-precip">💧 ${precip}%</div>
                 </div>`;
         }
         document.getElementById('weatherForecast').innerHTML = forecastHtml;

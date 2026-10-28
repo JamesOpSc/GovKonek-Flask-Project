@@ -88,11 +88,14 @@ def _barangay_options():
     Build the de-duplicated barangay dropdown options (used on both
     /register and /profile).
 
+    Fully dynamic: only barangays that were actually created by a
+    Barangay Captain (barangays.publisher_id IS NOT NULL) are listed.
+    On a fresh DB with no captains the list is empty, as expected.
+
     Normalized key = lowercased name without leading 'barangay ' and
     without trailing ', ...' — so 'Bagong Silangan' and
     'Barangay Bagong Silangan' collapse to one entry.
     """
-    CURATED = ['Payatas', 'Bagong Silangan', 'Batasan Hills', 'Barangay San Jose', 'Barangay 76, Pasay City']
     options = []
     seen = set()
 
@@ -102,17 +105,13 @@ def _barangay_options():
             n = n[9:]
         return n.split(',')[0].strip()
 
-    for name in CURATED:
-        key = _norm(name)
-        if key and key not in seen:
-            seen.add(key)
-            label = name if name.lower().startswith('barangay ') else f'Barangay {name}'
-            options.append({'value': name, 'label': label})
-
     try:
         for b in _get_services()['barangay_repo'].get_all():
             bname = (b.get('name') or '').strip()
             if not bname or bname == 'Barangay Hall':
+                continue
+            # Dynamic: only show barangays actually created by a captain
+            if b.get('publisher_id') is None:
                 continue
             key = _norm(bname)
             if key and key not in seen:

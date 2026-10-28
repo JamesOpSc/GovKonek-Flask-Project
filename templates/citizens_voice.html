@@ -311,19 +311,29 @@
 <!-- ================================================================= -->
 <!-- SEARCH + SORT BAR                                                 -->
 <!-- ================================================================= -->
-<div style="display:flex;gap:10px;margin-bottom:20px;align-items:center;">
+<div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
     <input type="text" id="searchInput" class="comment-input"
            placeholder="🔍 Search by title or username..."
-           style="flex:3;padding:11px 16px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;"
+           style="flex:3;min-width:200px;padding:11px 16px;border-radius:10px;border:1px solid #e2e8f0;font-size:14px;"
            oninput="debounceSearch()">
     <select id="sortSelect" class="comment-input"
-            style="flex:1;padding:11px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;font-weight:600;color:#475569;cursor:pointer;background:white;min-width:150px;"
+            style="flex:1;min-width:160px;padding:11px 14px;border-radius:10px;border:1px solid #e2e8f0;font-size:13px;font-weight:600;color:#475569;cursor:pointer;background:white;"
             onchange="debounceSearch()">
         <option value="newest">🕐 Newest First</option>
         <option value="oldest">📅 Oldest First</option>
         <option value="most_voted">👍 Most Voted</option>
         <option value="most_commented">💬 Most Discussed</option>
     </select>
+</div>
+
+<!-- Category Filter Pills -->
+<div class="voice-filters" id="voiceFilters">
+    <button class="voice-pill active" data-category="">All Categories</button>
+    <button class="voice-pill" data-category="General">💬 General</button>
+    <button class="voice-pill" data-category="Grievance">😠 Grievance</button>
+    <button class="voice-pill" data-category="Suggestion">💡 Suggestion</button>
+    <button class="voice-pill" data-category="Question">❓ Question</button>
+    <button class="voice-pill" data-category="Announcement">📢 Announcement</button>
 </div>
 
 <!-- ================================================================= -->
@@ -380,6 +390,7 @@
     // STATE
     // =====================================================================
     let selectedPostId = null;
+    let selectedCategory = '';
     let allPosts = [];
     let searchTimeout = null;
 
@@ -387,6 +398,16 @@
     // INIT
     // =====================================================================
     document.addEventListener('DOMContentLoaded', () => {
+        // Setup filter pills
+        document.getElementById('voiceFilters').addEventListener('click', (e) => {
+            const pill = e.target.closest('.voice-pill');
+            if (!pill) return;
+            document.querySelectorAll('.voice-pill').forEach(p => p.classList.remove('active'));
+            pill.classList.add('active');
+            selectedCategory = pill.dataset.category || '';
+            loadPosts();
+        });
+
         loadPosts();
     });
 
@@ -412,13 +433,14 @@
             const sort = document.getElementById('sortSelect').value;
             const params = new URLSearchParams();
             if (search) params.set('search', search);
+            if (selectedCategory) params.set('category', selectedCategory);
             if (sort && sort !== 'newest') params.set('sort', sort);
             const qs = params.toString();
             const url = '/api/voice' + (qs ? '?' + qs : '');
             const resp = await fetch(url);
             if (!resp.ok) throw new Error('Failed to load posts');
             const data = await resp.json();
-            allPosts = data.posts;
+            allPosts = data.posts || [];
 
             if (allPosts.length === 0) {
                 list.innerHTML = '';
@@ -656,16 +678,17 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, content, category })
             });
+            const data = await resp.json();
             if (!resp.ok) {
-                const err = await resp.json();
-                throw new Error(err.error || 'Failed to create post');
+                throw new Error(data.error || 'Failed to create post');
             }
             closeNewPostModal();
-            loadPosts();
-            // Select the newest post
-            setTimeout(() => {
-                if (allPosts.length > 0) selectPost(allPosts[0].id);
-            }, 300);
+            await loadPosts();
+            if (data.post && data.post.id) {
+                selectPost(data.post.id);
+            } else if (allPosts.length > 0) {
+                selectPost(allPosts[0].id);
+            }
         } catch (err) {
             alert(err.message);
         }
@@ -683,7 +706,7 @@
         if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
-        return div.innerHTML;
+        return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
 
     function formatTimeAgo(dateStr) {
