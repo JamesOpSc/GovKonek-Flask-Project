@@ -154,6 +154,8 @@ def _project_payload(data):
         'image_url': data.get('image_url', ''),
         'start_date': data.get('start_date', ''),
         'end_date': data.get('end_date', ''),
+        'latitude': data.get('latitude'),
+        'longitude': data.get('longitude'),
     }
 
 
@@ -183,10 +185,10 @@ def create_routes(app):
         barangay_options = _barangay_options()
 
         if request.method == 'POST':
-            # Extract form fields
-            username = request.form['username']
-            password = request.form['password']
-            role = request.form['role']
+            # Extract form fields safely (avoid KeyError on missing form keys)
+            username = request.form.get('username', '')
+            password = request.form.get('password', '')
+            role = request.form.get('role', '')
             barangay = request.form.get('barangay', '')
 
             # Delegate to AuthService for validation and user creation
@@ -268,19 +270,24 @@ def create_routes(app):
             if not barangay:
                 barangay = svc['barangay_repo'].get_first()
 
-        # Announcements published by this barangay's captain
+        # Announcements and projects published by this barangay's captain
         announcements = []
         if barangay and barangay.get('publisher_id'):
             posts = svc['post_repo'].get_posts_by_publisher(barangay['publisher_id'])
             announcements = [dict(p) for p in posts]
-
-        projects = svc['project_repo'].get_all()
+            projects = svc['project_repo'].get_by_publisher(barangay['publisher_id'])
+        else:
+            projects = svc['project_repo'].get_all()
 
         # Only the owning publisher can edit
         is_owner = bool(
             barangay
             and current_user.role == 'publisher'
             and barangay.get('publisher_id') == current_user.id
+        )
+        has_barangay = bool(
+            current_user.role == 'publisher'
+            and svc['barangay_repo'].get_by_publisher(current_user.id) is not None
         )
 
         return render_template(
@@ -291,6 +298,7 @@ def create_routes(app):
             announcements=announcements,
             projects=projects,
             is_owner=is_owner,
+            has_barangay=has_barangay,
             name=current_user.username,
             role=current_user.role,
         )
@@ -304,8 +312,8 @@ def create_routes(app):
         POST → authenticates credentials, redirects to the dashboard
         """
         if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
+            username = request.form.get('username', '')
+            password = request.form.get('password', '')
 
             svc = _get_services()
             success, user = svc['auth'].authenticate_user(username, password)
@@ -456,8 +464,8 @@ def create_routes(app):
         if uploaded_image and uploaded_image.filename:
             try:
                 image_path = _get_upload_helper().save(uploaded_image, prefix='post')
-            except ValueError:
-                pass  # Invalid file type — silently skip image
+            except ValueError as e:
+                return jsonify({'error': str(e)}), 400
 
         svc = _get_services()
         post, error = svc['posts'].create_post(current_user, title, content, category, image_path)
@@ -472,8 +480,9 @@ def create_routes(app):
         data = request.get_json()
         title = data.get('title', '') if data else ''
         content = data.get('content', '') if data else ''
+        category = data.get('category') if data else None
         svc = _get_services()
-        post, error = svc['posts'].update_post(current_user, post_id, title, content)
+        post, error = svc['posts'].update_post(current_user, post_id, title, content, category=category)
         if error:
             return jsonify({'error': error}), 403
         return jsonify({'post': post})
@@ -528,9 +537,18 @@ def create_routes(app):
         if not barangay:
             barangay = svc['barangay_repo'].get_first()
 
-        # Fetch barangay stats for the landing page
-        projects = svc['project_repo'].get_all()
-        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
+        # Fetch barangay stats for the landing page (scoped to publisher when owned)
+        if barangay and barangay.get('publisher_id'):
+            projects = svc['project_repo'].get_by_publisher(barangay['publisher_id'])
+            announcements = svc['post_repo'].get_posts_by_publisher(barangay['publisher_id'])
+        else:
+            projects = svc['project_repo'].get_all()
+            announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
+
+        has_barangay = bool(
+            current_user.role == 'publisher'
+            and svc['barangay_repo'].get_by_publisher(current_user.id) is not None
+        )
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
@@ -538,6 +556,7 @@ def create_routes(app):
                                barangay=barangay,
                                barangay_name=_barangay_display_name(barangay),
                                is_owner=is_owner,
+                               has_barangay=has_barangay,
                                projects=projects,
                                announcements=announcements)
 
@@ -553,9 +572,17 @@ def create_routes(app):
 
         is_owner = (current_user.role == 'publisher' and
                     barangay.get('publisher_id') == current_user.id)
+        has_barangay = bool(
+            current_user.role == 'publisher'
+            and svc['barangay_repo'].get_by_publisher(current_user.id) is not None
+        )
 
-        projects = svc['project_repo'].get_all()
-        announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
+        if barangay and barangay.get('publisher_id'):
+            projects = svc['project_repo'].get_by_publisher(barangay['publisher_id'])
+            announcements = svc['post_repo'].get_posts_by_publisher(barangay['publisher_id'])
+        else:
+            projects = svc['project_repo'].get_all()
+            announcements = svc['posts'].get_feed(category='Announcement', sort='newest')
 
         return render_template('barangay_landing.html',
                                name=current_user.username,
@@ -563,6 +590,7 @@ def create_routes(app):
                                barangay=barangay,
                                barangay_name=_barangay_display_name(barangay),
                                is_owner=is_owner,
+                               has_barangay=has_barangay,
                                projects=projects,
                                announcements=announcements)
 
@@ -703,7 +731,8 @@ def create_routes(app):
         project, error = svc['project_service'].create_project(
             current_user, payload['title'], payload['description'], payload['status'],
             payload['budget'], payload['location'], payload['image_url'],
-            payload['start_date'], payload['end_date']
+            payload['start_date'], payload['end_date'],
+            latitude=payload['latitude'], longitude=payload['longitude']
         )
         if error:
             return jsonify({'error': error}), 403
@@ -718,7 +747,8 @@ def create_routes(app):
         project, error = svc['project_service'].update_project(
             current_user, project_id, payload['title'], payload['description'], payload['status'],
             payload['budget'], payload['location'], payload['image_url'],
-            payload['start_date'], payload['end_date']
+            payload['start_date'], payload['end_date'],
+            latitude=payload['latitude'], longitude=payload['longitude']
         )
         if error:
             return jsonify({'error': error}), 403
@@ -806,8 +836,8 @@ def create_routes(app):
                 profile_picture_path = _get_upload_helper().save(
                     uploaded_file, prefix=f'profile_{current_user.id}'
                 )
-            except ValueError:
-                profile_picture_path = existing_pic  # invalid type — keep existing
+            except ValueError as e:
+                return jsonify({'error': str(e)}), 400
         else:
             profile_picture_path = existing_pic
 

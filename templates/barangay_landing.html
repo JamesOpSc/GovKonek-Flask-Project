@@ -337,7 +337,7 @@
                 <button class="hero-btn hero-btn-outline" onclick="toggleEditForm()" style="cursor:pointer;">
                     ✏️ Edit Barangay Info
                 </button>
-                {% elif role == 'publisher' and not is_owner %}
+                {% elif role == 'publisher' and not is_owner and not has_barangay %}
                 <button class="hero-btn hero-btn-outline" onclick="toggleCreateForm()" style="cursor:pointer;">
                     🏛️ Create My Barangay
                 </button>
@@ -776,7 +776,8 @@
     (function() {
         const params = new URLSearchParams(window.location.search);
         const isOwner = {{ 'true' if is_owner else 'false' }};
-        if (params.get('create') === '1' && !isOwner) {
+        const hasBarangay = {{ 'true' if has_barangay else 'false' }};
+        if (params.get('create') === '1' && !isOwner && !hasBarangay) {
             toggleCreateForm();
             // Clean the URL without reloading
             if (window.history && window.history.replaceState) {

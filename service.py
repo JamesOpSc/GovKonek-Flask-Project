@@ -150,6 +150,9 @@ class AuthService(BaseService):
         except RequiredFieldError as e:
             return False, str(e)
 
+        if role not in ('citizen', 'publisher'):
+            return False, "Invalid role. Must be 'citizen' or 'publisher'."
+
         # Check if username is already taken
         if self._user_repo.find_by_username(username):
             return False, "Username already exists. Try another one."
@@ -195,11 +198,13 @@ class PostService(BaseService):
     ALLOWED_EMOJI = {'👍', '❤️', '😄', '😢', '😡', '🎉'}
     VALID_CATEGORIES = ['Announcement', 'Emergency', 'Health', 'Project']
 
-    def __init__(self, post_repo=None):
+    def __init__(self, post_repo=None, upload_helper=None):
         """
         @param post_repo: PostRepository instance (injected).
+        @param upload_helper: FileUploadHelper instance (optional, for deleting attached images).
         """
         self._post_repo = post_repo or PostRepository()
+        self._upload_helper = upload_helper or FileUploadHelper()
 
     # -- feed / detail ----------------------------------------------------
 
@@ -309,7 +314,7 @@ class PostService(BaseService):
         )
         return (post, None) if post else (None, "Failed to create post.")
 
-    def update_post(self, user, post_id, title, content):
+    def update_post(self, user, post_id, title, content, category=None):
         """Update a post. ONLY the publisher who created it can edit."""
         try:
             self._check_publisher(user)
@@ -318,7 +323,15 @@ class PostService(BaseService):
         except (PermissionDeniedError, RequiredFieldError) as e:
             return None, str(e)
 
-        post = self._post_repo.update_post(post_id, user.id, self._sanitize(title), self._sanitize(content))
+        if category is not None:
+            category = self._validate_choice(category, 'category', self.VALID_CATEGORIES)
+            post = self._post_repo.update_post(
+                post_id, user.id, self._sanitize(title), self._sanitize(content), category=category
+            )
+        else:
+            post = self._post_repo.update_post(
+                post_id, user.id, self._sanitize(title), self._sanitize(content)
+            )
         return (post, None) if post else (None, "Post not found or you are not authorized to edit it.")
 
     def delete_post(self, user, post_id):
@@ -327,12 +340,14 @@ class PostService(BaseService):
             self._check_publisher(user)
         except PermissionDeniedError as e:
             return False, str(e)
+        existing = self._post_repo.get_post_by_id(post_id)
         deleted = self._post_repo.delete_post(post_id, user.id)
         if deleted == 0:
-            post = self._post_repo.get_post_by_id(post_id)
-            if post is None:
+            if existing is None:
                 return False, "Post not found."
             return False, "You are not authorized to delete this post."
+        if existing and 'image_path' in existing.keys() and existing['image_path']:
+            self._upload_helper.delete(existing['image_path'])
         return True, None
 
 
@@ -629,6 +644,12 @@ class ProjectService(BaseService):
         if start_date and end_date and end_date < start_date:
             return None, "End date cannot be before start date."
 
+        if latitude is None and longitude is None:
+            existing = self._repo.get_by_id(project_id)
+            if existing:
+                latitude = existing.get('latitude')
+                longitude = existing.get('longitude')
+
         project = self._repo.update(
             project_id=project_id, publisher_id=user.id,
             title=self._sanitize(title),
@@ -794,6 +815,17 @@ class DocumentService(BaseService):
         if category not in self.VALID_CATEGORIES:
             category = 'General'
 
+        # Calculate file size for display in the UI BEFORE saving (since .save() consumes the stream)
+        file_size = ''
+        if file:
+            try:
+                file.seek(0, os.SEEK_END)  # Move to end to get total size
+                file_size_bytes = file.tell()
+                file.seek(0)  # Reset to beginning so .save() works correctly
+                file_size = self._format_file_size(file_size_bytes)
+            except (AttributeError, OSError):
+                file_size = ''
+
         # Validate + save the file via the shared FileUploadHelper.
         # EXCEPTION HANDLING: ValueError (no file / bad extension) is converted
         # into a user-friendly error message instead of crashing the request.
@@ -801,12 +833,6 @@ class DocumentService(BaseService):
             file_url = self._upload_helper.save(file, prefix='doc')
         except ValueError as e:
             return None, str(e)
-
-        # Calculate file size for display in the UI
-        file.seek(0, os.SEEK_END)  # Move to end to get total size
-        file_size_bytes = file.tell()
-        file.seek(0)  # Reset to beginning so .save() works correctly
-        file_size = self._format_file_size(file_size_bytes)
 
         # Use today's date if the publisher didn't specify one
         if not published_date:
@@ -846,6 +872,10 @@ class DocumentService(BaseService):
         doc = self._repo.get_by_id(document_id)
         if not doc:
             return False, "Document not found."
+
+        # Ownership check: if the document records a publisher_id, only that publisher can delete it
+        if doc.get('publisher_id') is not None and doc.get('publisher_id') != user.id:
+            return False, "You are not authorized to delete this document."
 
         # Step 1: Delete the physical file from disk (shared FileUploadHelper).
         # delete() safely no-ops for empty, '#', or already-missing files.
@@ -989,7 +1019,19 @@ class BarangayService(BaseService):
         if barangay.get('publisher_id') != user.id:
             return None, "You are not authorized to edit this barangay."
 
-        updated = self._repo.update(barangay_id, user.id, **fields)
+        if 'name' in fields and (fields['name'] is None or not str(fields['name']).strip()):
+            return None, "Barangay name is required."
+        if 'address' in fields and (fields['address'] is None or not str(fields['address']).strip()):
+            return None, "Barangay address is required."
+
+        sanitized_fields = {}
+        for k, v in fields.items():
+            if k in ('name', 'description', 'address', 'phone', 'email', 'facebook', 'motto') and isinstance(v, str):
+                sanitized_fields[k] = self._sanitize(v)
+            else:
+                sanitized_fields[k] = v
+
+        updated = self._repo.update(barangay_id, user.id, **sanitized_fields)
         return (updated, None) if updated else (None, "Failed to update barangay page.")
 
     def delete_barangay(self, user, barangay_id):

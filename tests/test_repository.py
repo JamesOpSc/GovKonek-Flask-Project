@@ -363,11 +363,22 @@ class TestPostRepository(unittest.TestCase):
         self.assertEqual(updated['title'], 'New')
         self.assertEqual(updated['content'], 'NewC')
 
-    def test_delete_post(self):
-        """delete_post should remove the post."""
+    def test_update_post_with_category(self):
+        """update_post with category should modify the category as well."""
+        created = self.repo.create_post(self.publisher_id, 'Old', 'OldC', 'Announcement')
+        updated = self.repo.update_post(created['id'], self.publisher_id, 'New', 'NewC', category='Emergency')
+        self.assertIsNotNone(updated)
+        self.assertEqual(updated['category'], 'Emergency')
+
+    def test_delete_post_cascades_comments_and_reactions(self):
+        """delete_post should remove the post and cascade-delete comments/reactions via foreign_keys=ON."""
         created = self.repo.create_post(self.publisher_id, 'Del', 'DelC', 'Announcement')
+        self.repo.add_comment(created['id'], self.publisher_id, 'A comment')
+        self.repo.toggle_reaction(created['id'], self.publisher_id, '👍')
         result = self.repo.delete_post(created['id'], self.publisher_id)
         self.assertTrue(result)
+        self.assertEqual(len(self.repo.get_comments_for_post(created['id'])), 0)
+        self.assertEqual(len(self.repo.get_reactions_for_post(created['id'])), 0)
 
 
 if __name__ == '__main__':

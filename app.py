@@ -66,7 +66,7 @@ def _build_services(app, config):
 
     # -- services (injectable repositories + shared upload helper) --------
     auth_service = AuthService(user_repo=user_repo)
-    post_service = PostService(post_repo=post_repo)
+    post_service = PostService(post_repo=post_repo, upload_helper=upload_helper)
     voice_service = VoiceService(voice_repo=voice_repo)
     project_service = ProjectService(project_repo=project_repo)
     document_service = DocumentService(

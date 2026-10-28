@@ -77,7 +77,7 @@
 <script>
     // Pass server-side data to JS for ALL roles
     window.GOVKONEK_USER_ID = {{ current_user.id }};
-    window.GOVKONEK_USERNAME = "{{ current_user.username }}";
+    window.GOVKONEK_USERNAME = {{ current_user.username | tojson }};
 </script>
 
 {% if role == 'publisher' %}

@@ -1,6 +1,9 @@
 """Integration test: verify the README flow works after refactoring."""
 import sys, os, tempfile, sqlite3
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 # Ensure the project root is on the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -90,6 +93,17 @@ tables_sql = [
         FOREIGN KEY (voice_post_id) REFERENCES voice_posts(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id),
         UNIQUE(voice_post_id, user_id))''',
+    '''CREATE TABLE IF NOT EXISTS barangays (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL DEFAULT 'Barangay Hall',
+        description TEXT DEFAULT '', address TEXT DEFAULT '',
+        phone TEXT DEFAULT '', email TEXT DEFAULT '',
+        facebook TEXT DEFAULT '', office_hours_weekday TEXT DEFAULT '8:00 AM – 5:00 PM',
+        office_hours_saturday TEXT DEFAULT '8:00 AM – 12:00 PM',
+        motto TEXT DEFAULT '', hero_image TEXT DEFAULT '',
+        latitude REAL DEFAULT 14.71309, longitude REAL DEFAULT 121.10063,
+        publisher_id INTEGER, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (publisher_id) REFERENCES users(id))''',
 ]
 
 for sql in tables_sql:

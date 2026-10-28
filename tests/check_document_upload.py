@@ -1,5 +1,8 @@
 """Integration test for Transparency Document upload feature."""
-import sys, os, tempfile, sqlite3, io
+import sys, os, tempfile, sqlite3, io, shutil
+
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -29,13 +32,13 @@ c.execute('''CREATE TABLE IF NOT EXISTS documents (
 conn.commit()
 conn.close()
 
-# Ensure upload folder exists
-os.makedirs('static/uploads', exist_ok=True)
+# Use an isolated temporary upload folder so real static/uploads files are untouched
+tmp_upload_dir = tempfile.mkdtemp(prefix='govkonek_test_uploads_')
 
 from config import Config
 from app import create_app
 
-app = create_app(Config(db_name=db_path, secret_key='test'))
+app = create_app(Config(db_name=db_path, secret_key='test', upload_folder=tmp_upload_dir))
 client = app.test_client()
 
 results = []
@@ -79,8 +82,8 @@ if docs:
     ok = doc['file_size'] is not None and len(doc['file_size']) > 0
     results.append(('File size recorded', ok))
 
-    # Verify physical file exists
-    file_path = os.path.join(os.getcwd(), doc['file_url'].lstrip('/'))
+    # Verify physical file exists in isolated temp upload folder
+    file_path = os.path.join(tmp_upload_dir, os.path.basename(doc['file_url']))
     ok = os.path.exists(file_path)
     results.append(('File exists on disk', ok))
 
@@ -119,9 +122,7 @@ results.append(('Citizen upload blocked (403)', ok))
 # Cleanup
 client.get('/logout')
 os.unlink(db_path)
-for f in os.listdir('static/uploads'):
-    if f.startswith('2026'):
-        os.remove(os.path.join('static/uploads', f))
+shutil.rmtree(tmp_upload_dir, ignore_errors=True)
 
 # Report
 print()

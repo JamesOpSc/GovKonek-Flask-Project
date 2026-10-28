@@ -21,9 +21,13 @@
             <div>
                 <label style="display:block;font-size:13px;font-weight:600;color:#475569;margin-bottom:4px;">My Barangay</label>
                 {% if barangay_options %}
+                {% set cur_brgy = (current_barangay or barangay or '')|trim %}
+                {% set cur_brgy_norm = cur_brgy[9:] if cur_brgy.lower().startswith('barangay ') else cur_brgy %}
                 <select id="profileBarangay" name="barangay" style="width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#0f172a;background:#fff;cursor:pointer;">
+                    <option value="" {% if not cur_brgy %}selected{% endif %}>-- Select your barangay --</option>
                     {% for opt in barangay_options %}
-                    <option value="{{ opt.value }}" {% if opt.value == (current_barangay or barangay or '') %}selected{% endif %}>{{ opt.label }}</option>
+                    {% set opt_norm = opt.value[9:] if opt.value.lower().startswith('barangay ') else opt.value %}
+                    <option value="{{ opt.value }}" {% if cur_brgy and (opt.value|lower == cur_brgy|lower or opt_norm|lower == cur_brgy_norm|lower) %}selected{% endif %}>{{ opt.label }}</option>
                     {% endfor %}
                 </select>
                 {% else %}
@@ -80,8 +84,10 @@ async function loadProfile() {
             if (data.profile.barangay) {
                 const sel = document.getElementById('profileBarangay');
                 // only override if the value is actually in the dropdown (dedup-safe)
-                const has = Array.from(sel.options).some(o => o.value === data.profile.barangay);
-                if (has) sel.value = data.profile.barangay;
+                const norm = s => (s || '').trim().toLowerCase().replace(/^barangay\s+/, '');
+                const targetNorm = norm(data.profile.barangay);
+                const matchOpt = Array.from(sel.options).find(o => o.value && (o.value === data.profile.barangay || norm(o.value) === targetNorm));
+                if (matchOpt) sel.value = matchOpt.value;
             }
             if (data.profile.profile_picture) {
                 const avatar = document.getElementById('profileAvatar');

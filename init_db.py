@@ -227,9 +227,16 @@ def create_database():
             file_url TEXT DEFAULT '#',
             file_size TEXT DEFAULT '',
             published_date TEXT DEFAULT '',
+            publisher_id INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # -- Migration: add publisher_id to documents for ownership tracking ---
+    try:
+        cursor.execute("ALTER TABLE documents ADD COLUMN publisher_id INTEGER REFERENCES users(id)")
+    except sqlite3.OperationalError:
+        pass
 
     # ===================================================================
     # CITIZENS' VOICE FORUM TABLES

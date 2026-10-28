@@ -244,7 +244,7 @@
                         <div style="font-size:13px;color:#475569;margin-top:6px;line-height:1.4;overflow-wrap:break-word;word-break:break-word;">${escapeHtml((proj.description || '').substring(0, 120))}...</div>
                         <div style="font-size:12px;color:#64748b;margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;">
                             <span>💰 <strong>${budgetStr}</strong></span>
-                            ${dates ? '<span>📅 ' + dates + '</span>' : ''}
+                            ${dates ? '<span>📅 ' + escapeHtml(dates) + '</span>' : ''}
                         </div>
                         ${proj.location ? '<div style="font-size:12px;color:#64748b;margin-top:4px;">📍 ' + escapeHtml(proj.location) + '</div>' : ''}
                     `);

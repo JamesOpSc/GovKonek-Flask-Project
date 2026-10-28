@@ -293,8 +293,8 @@
 
 <script>
     window.GOVKONEK_USER_ID = {{ user_id }};
-    window.GOVKONEK_USERNAME = "{{ name }}";
-    window.GOVKONEK_ROLE = "{{ role }}";
+    window.GOVKONEK_USERNAME = {{ name | tojson }};
+    window.GOVKONEK_ROLE = {{ role | tojson }};
 </script>
 
 <!-- ================================================================= -->

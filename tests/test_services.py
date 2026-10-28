@@ -152,6 +152,12 @@ class TestAuthService(unittest.TestCase):
         self.assertFalse(success)
         self.assertIn('already exists', msg.lower())
 
+    def test_register_invalid_role_fails(self):
+        """Register with a role other than 'citizen' or 'publisher' should fail."""
+        success, msg = self.svc.register_user('hacker', 'pass123', 'admin')
+        self.assertFalse(success)
+        self.assertIn('invalid role', msg.lower())
+
     def test_authenticate_valid_user(self):
         """Authenticate with correct credentials should succeed."""
         self.svc.register_user('maria', 'mysecret', 'citizen')
@@ -277,6 +283,13 @@ class TestPostService(unittest.TestCase):
         result, error = self.svc.toggle_reaction(1, 2, '🔥')
         self.assertIsNotNone(error)
         self.assertIn('Invalid emoji', error)
+
+    def test_update_post_changes_category(self):
+        """Publisher should be able to update a post's category."""
+        created, _ = self.svc.create_post(self.publisher, 'T', 'C', category='Announcement')
+        updated, err = self.svc.update_post(self.publisher, created['id'], 'T2', 'C2', category='Health')
+        self.assertIsNone(err)
+        self.assertEqual(updated['category'], 'Health')
 
 
 if __name__ == '__main__':

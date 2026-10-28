@@ -1,4 +1,4 @@
-﻿"""
+"""
 GovKonek UI Page & Template Rendering Tests
 
 Tests that verify UI bug fixes, template rendering, flash alert categorization,
@@ -238,6 +238,92 @@ class TestUIPages(unittest.TestCase):
         html = resp.get_data(as_text=True)
         self.assertIn('Transparency Documents', html)
         self.assertIn('categorySelect', html)
+
+    def test_sidebar_mobile_media_query_properly_closed(self):
+        """Verify .btn-logout:hover is closed before @media (max-width: 768px) in sidebar."""
+        self.client.post('/login', data={'username': 'ui_citizen', 'password': 'password123'})
+        resp = self.client.get('/dashboard')
+        html = resp.get_data(as_text=True)
+        self.assertIn('background: #fef2f2;\n    }\n    @media (max-width: 768px)', html)
+
+    def test_base_shared_spinner_and_status_badge_css(self):
+        """Verify base.html provides shared .loading-spinner and .status-published styles."""
+        self.client.post('/login', data={'username': 'ui_citizen', 'password': 'password123'})
+        resp = self.client.get('/documents')
+        html = resp.get_data(as_text=True)
+        self.assertIn('.loading-spinner', html)
+        self.assertIn('.status-published', html)
+
+    def test_post_detail_announcement_badge_css(self):
+        """Verify post_detail.html defines .badge-cat-Announcement."""
+        self.client.post('/login', data={'username': 'ui_captain', 'password': 'password123'})
+        create_resp = self.client.post('/api/posts', json={
+            'title': 'Badge Check',
+            'content': 'Testing Announcement badge style',
+            'category': 'Announcement'
+        })
+        post_id = create_resp.get_json()['post']['id']
+        resp = self.client.get(f'/post/{post_id}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('.badge-cat-Announcement', html)
+
+    def test_profile_blank_barangay_option_for_unset_user(self):
+        """Verify profile dropdown includes blank placeholder option so unset barangay isn't overwritten."""
+        self.client.post('/login', data={'username': 'ui_captain', 'password': 'password123'})
+        self.client.post('/api/barangays', json={
+            'name': 'Barangay Payatas',
+            'address': 'Payatas Road, QC'
+        })
+        self.client.get('/logout')
+        self.client.post('/login', data={'username': 'ui_citizen', 'password': 'password123'})
+        resp = self.client.get('/profile')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('-- Select your barangay --', html)
+
+    def test_project_coordinates_saved_and_preserved_on_update(self):
+        """Verify project latitude/longitude are saved on POST and preserved on PUT when omitted."""
+        self.client.post('/login', data={'username': 'ui_captain', 'password': 'password123'})
+        create_resp = self.client.post('/api/projects', json={
+            'title': 'Pinned Project',
+            'description': 'Has coordinates',
+            'status': 'ongoing',
+            'latitude': 14.72,
+            'longitude': 121.11
+        })
+        self.assertEqual(create_resp.status_code, 201)
+        proj = create_resp.get_json()['project']
+        self.assertAlmostEqual(proj['latitude'], 14.72)
+        self.assertAlmostEqual(proj['longitude'], 121.11)
+
+        # Update without lat/lng -> should preserve existing coordinates
+        update_resp = self.client.put(f"/api/projects/{proj['id']}", json={
+            'title': 'Pinned Project Updated',
+            'description': 'Still has coordinates',
+            'status': 'completed'
+        })
+        self.assertEqual(update_resp.status_code, 200)
+        updated = update_resp.get_json()['project']
+        self.assertAlmostEqual(updated['latitude'], 14.72)
+        self.assertAlmostEqual(updated['longitude'], 121.11)
+
+    def test_invalid_image_upload_returns_400_on_post_and_profile(self):
+        """Verify uploading a disallowed file type to /api/posts or /api/profile returns 400."""
+        import io
+        self.client.post('/login', data={'username': 'ui_captain', 'password': 'password123'})
+        resp = self.client.post('/api/posts', data={
+            'title': 'Bad Image Post',
+            'content': 'Content',
+            'image': (io.BytesIO(b'bad'), 'malware.exe')
+        }, content_type='multipart/form-data')
+        self.assertEqual(resp.status_code, 400)
+
+        resp2 = self.client.post('/api/profile', data={
+            'email': 'cap@govkonek.ph',
+            'profile_picture': (io.BytesIO(b'bad'), 'malware.exe')
+        }, content_type='multipart/form-data')
+        self.assertEqual(resp2.status_code, 400)
 
 
 if __name__ == '__main__':

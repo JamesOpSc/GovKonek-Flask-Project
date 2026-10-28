@@ -208,13 +208,13 @@
                 <tbody>
                     ${data.posts.map(p => `
                         <tr>
-                            <td><span class="status-badge status-published">${p.status || 'Published'}</span></td>
+                            <td><span class="status-badge status-published">${escapeHtml(p.status || 'Published')}</span></td>
                             <td><span style="font-size:12px;font-weight:600;color:#64748b;">${escapeHtml(p.category || 'Announcement')}</span></td>
                             <td style="font-weight:600;">${escapeHtml(p.title)}</td>
                             <td style="color:#64748b;">${formatDateShort(p.created_at)}</td>
                             <td>
-                                <button class="btn-action edit" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}" data-content="${escapeHtml(p.content)}" data-category="${escapeHtml(p.category || '')}">✏️ Edit</button>
-                                <button class="btn-action delete" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}">🗑️ Delete</button>
+                                ${(!window.GOVKONEK_USER_ID || p.publisher_id == window.GOVKONEK_USER_ID) ? `<button class="btn-action edit" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}" data-content="${escapeHtml(p.content)}" data-category="${escapeHtml(p.category || '')}">✏️ Edit</button>` : `<span style="font-size:12px;color:#94a3b8;">By ${escapeHtml(p.publisher_name || 'other')}</span>`}
+                                ${(!window.GOVKONEK_USER_ID || p.publisher_id == window.GOVKONEK_USER_ID) ? `<button class="btn-action delete" data-post-id="${p.id}" data-title="${escapeHtml(p.title)}">🗑️ Delete</button>` : ''}
                             </td>
                         </tr>
                     `).join('')}
@@ -278,7 +278,7 @@
                 res = await fetch(`/api/posts/${editingPostId}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, content })
+                    body: JSON.stringify({ title, content, category })
                 });
             } else {
                 // Create — use FormData for file upload support

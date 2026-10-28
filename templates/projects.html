@@ -323,6 +323,16 @@
                     <input type="date" id="projEndDate">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="projLat">Latitude (optional)</label>
+                    <input type="number" step="any" id="projLat" placeholder="14.71309">
+                </div>
+                <div class="form-group">
+                    <label for="projLng">Longitude (optional)</label>
+                    <input type="number" step="any" id="projLng" placeholder="121.10063">
+                </div>
+            </div>
             <div class="modal-actions">
                 <button type="button" class="btn-cancel" onclick="closeProjectModal()">Cancel</button>
                 <button type="submit" class="btn-save" id="btnSave">Create Project</button>
@@ -368,7 +378,7 @@
     function renderProject(p) {
         const statusClass = 'status-' + (p.status || 'planned');
         const imgHtml = p.image_url
-            ? `<img src="${p.image_url}" alt="${escapeHtml(p.title)}" class="project-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">`
+            ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.title)}" class="project-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" loading="lazy">`
             : '';
         const placeholder = p.image_url
             ? `<div class="project-img-placeholder" style="display:none;">🏗️</div>`
@@ -383,17 +393,17 @@
             </div>` : '';
 
         return `
-        <div class="project-card" data-status="${p.status}" data-id="${p.id}">
+        <div class="project-card" data-status="${escapeHtml(p.status)}" data-id="${p.id}">
             ${imgHtml}${placeholder}
             ${actionsHtml}
             <div class="project-body">
-                <span class="project-status ${statusClass}">${p.status}</span>
+                <span class="project-status ${statusClass}">${escapeHtml(p.status)}</span>
                 <h4 class="project-title">${escapeHtml(p.title)}</h4>
                 ${renderDescription(p.description)}
                 <div class="project-meta">
                     <span>📍 ${escapeHtml(p.location || 'Barangay-wide')}</span>
                     <span class="budget">💰 ${formatCurrency(p.budget)}</span>
-                    ${p.start_date ? `<span>📅 ${p.start_date} → ${p.end_date || 'TBD'}</span>` : ''}
+                    ${p.start_date ? `<span>📅 ${escapeHtml(p.start_date)} → ${escapeHtml(p.end_date || 'TBD')}</span>` : ''}
                 </div>
             </div>
         </div>`;
@@ -489,6 +499,8 @@
             document.getElementById('projImageUrl').value = p.image_url || '';
             document.getElementById('projStartDate').value = p.start_date || '';
             document.getElementById('projEndDate').value = p.end_date || '';
+            document.getElementById('projLat').value = p.latitude != null ? p.latitude : '';
+            document.getElementById('projLng').value = p.longitude != null ? p.longitude : '';
         } else {
             // Create mode
             modalTitle.textContent = 'New Project';
@@ -521,7 +533,9 @@
             location: document.getElementById('projLocation').value.trim(),
             image_url: document.getElementById('projImageUrl').value.trim(),
             start_date: document.getElementById('projStartDate').value,
-            end_date: document.getElementById('projEndDate').value
+            end_date: document.getElementById('projEndDate').value,
+            latitude: document.getElementById('projLat').value !== '' ? parseFloat(document.getElementById('projLat').value) : null,
+            longitude: document.getElementById('projLng').value !== '' ? parseFloat(document.getElementById('projLng').value) : null
         };
 
         const url = isEdit ? `/api/projects/${projectId}` : '/api/projects';

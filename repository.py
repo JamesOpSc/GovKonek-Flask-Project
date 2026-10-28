@@ -58,6 +58,7 @@ class DBContext:
         try:
             self._connection = sqlite3.connect(self._db_path)
             self._connection.row_factory = sqlite3.Row
+            self._connection.execute('PRAGMA foreign_keys = ON')
             return self._connection
         except sqlite3.Error as e:
             raise ConnectionError(self._db_path, original_error=e)
@@ -90,6 +91,7 @@ def _connect(db_path):
     """Create a connection with Row factory enabled. Legacy helper."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA foreign_keys = ON')
     return conn
 
 
@@ -288,12 +290,18 @@ class PostRepository(BaseRepository):
         ''', (post_id,), fetch='one')
         return dict(post) if post else None
 
-    def update_post(self, post_id, publisher_id, title, content):
+    def update_post(self, post_id, publisher_id, title, content, category=None):
         """Update a post. Only the owning publisher can update."""
-        cursor = self._execute_write(
-            'UPDATE posts SET title = ?, content = ? WHERE id = ? AND publisher_id = ?',
-            (title, content, post_id, publisher_id)
-        )
+        if category is not None:
+            cursor = self._execute_write(
+                'UPDATE posts SET title = ?, content = ?, category = ? WHERE id = ? AND publisher_id = ?',
+                (title, content, category, post_id, publisher_id)
+            )
+        else:
+            cursor = self._execute_write(
+                'UPDATE posts SET title = ?, content = ? WHERE id = ? AND publisher_id = ?',
+                (title, content, post_id, publisher_id)
+            )
         # Ownership gate: if no rows were affected, caller is not the owner (or post doesn't exist)
         if cursor.rowcount == 0:
             return None
@@ -693,12 +701,20 @@ class DocumentRepository(BaseRepository):
         @param publisher_id: Publisher's user ID (reserved for future ownership tracking)
         @return: Created document dict or None on failure
         """
-        cursor = self._execute_write(
-            '''INSERT INTO documents
-               (title, description, category, file_url, file_size, published_date)
-               VALUES (?, ?, ?, ?, ?, ?)''',
-            (title, description, category, file_url, file_size, published_date)
-        )
+        try:
+            cursor = self._execute_write(
+                '''INSERT INTO documents
+                   (title, description, category, file_url, file_size, published_date, publisher_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (title, description, category, file_url, file_size, published_date, publisher_id)
+            )
+        except DatabaseError:
+            cursor = self._execute_write(
+                '''INSERT INTO documents
+                   (title, description, category, file_url, file_size, published_date)
+                   VALUES (?, ?, ?, ?, ?, ?)''',
+                (title, description, category, file_url, file_size, published_date)
+            )
         doc = self._execute(
             'SELECT * FROM documents WHERE id = ?', (cursor.lastrowid,), fetch='one'
         )
@@ -728,10 +744,17 @@ class DocumentRepository(BaseRepository):
                              future per-publisher ownership tracking)
         @return: True
         """
-        self._execute_write(
-            'DELETE FROM documents WHERE id = ?', (document_id,)
-        )
-        return True
+        try:
+            cursor = self._execute_write(
+                'DELETE FROM documents WHERE id = ? AND (publisher_id IS NULL OR publisher_id = ?)',
+                (document_id, publisher_id)
+            )
+            return cursor.rowcount > 0
+        except DatabaseError:
+            self._execute_write(
+                'DELETE FROM documents WHERE id = ?', (document_id,)
+            )
+            return True
 
 
 # ===========================================================================

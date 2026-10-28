@@ -67,6 +67,18 @@ class TestProjectPayload(unittest.TestCase):
         self.assertEqual(payload['status'], '')
         self.assertEqual(payload['budget'], 0)
         self.assertEqual(payload['start_date'], '')
+        self.assertIsNone(payload['latitude'])
+        self.assertIsNone(payload['longitude'])
+
+    def test_extracts_latitude_and_longitude(self):
+        """Latitude and longitude are extracted when provided."""
+        payload = _project_payload({
+            'title': 'Geo Project',
+            'latitude': 14.71309,
+            'longitude': 121.10063,
+        })
+        self.assertAlmostEqual(payload['latitude'], 14.71309)
+        self.assertAlmostEqual(payload['longitude'], 121.10063)
 
 
 if __name__ == '__main__':
